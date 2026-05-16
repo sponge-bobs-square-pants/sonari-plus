@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { listProducts } from '../services/productApi'
-import { categories } from '../data/categories'
+import { categories, sizesForCategory } from '../data/categories'
 import Header from '../components/layout/Header'
 import Footer from '../components/layout/Footer'
 import ProductCard from '../components/product/ProductCard'
@@ -22,6 +22,8 @@ export default function ShopPage() {
   const activeCategory =
     categories.find((c) => c.id === searchParams.get('category')) || null
   const activeCategoryId = activeCategory?.id ?? null
+  const isKids = activeCategoryId === 'kids'
+  const sizeOptions = sizesForCategory(activeCategoryId)
 
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [sort, setSort] = useState('newest')
@@ -40,7 +42,10 @@ export default function ShopPage() {
   const pageRef = useRef(1)
   const loadingMoreRef = useRef(false)
 
-  const activeCount = filters.sizes.length + (filters.price !== 'all' ? 1 : 0)
+  const activeCount =
+    filters.sizes.length +
+    (filters.price !== 'all' ? 1 : 0) +
+    (isKids && filters.gender !== 'all' ? 1 : 0)
 
   // Translate the UI state into the API's query params. Memoised so it
   // changes identity ONLY when a real query input changes — which is
@@ -56,6 +61,11 @@ export default function ShopPage() {
         priceMin: bucket?.min,
         priceMax: bucket?.max,
         sort,
+        // gender only applies while browsing the kids category
+        gender:
+          activeCategoryId === 'kids' && filters.gender !== 'all'
+            ? filters.gender
+            : undefined,
       }
     },
     [activeCategoryId, filters, sort],
@@ -204,6 +214,8 @@ export default function ShopPage() {
         onSortChange={setSort}
         resultCount={total}
         activeCount={activeCount}
+        sizeOptions={sizeOptions}
+        showGender={isKids}
       />
     </>
   )

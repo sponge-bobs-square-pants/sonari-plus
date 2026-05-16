@@ -35,6 +35,7 @@ export async function listProducts(req, res, next) {
     const query = {}
     if (req.query.category) query.category = req.query.category
     if (req.query.tag) query.tag = req.query.tag
+    if (req.query.gender) query.gender = req.query.gender // kids: boy | girl
 
     // Name search (admin) — case-insensitive substring. User input is
     // regex-escaped so characters like ( ) . * can't break the query.

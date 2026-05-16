@@ -15,10 +15,10 @@ const ALIGN = {
 /**
  * Tile shadow, kept off the section's outer margins per tile:
  *  - `all`         — lifts the whole card (interior tiles).
- *  - `right`       — glow on the inner edge only (tall Nightwear tile).
+ *  - `right`       — glow on the inner edge only (tall Cordset tile).
  *  - `no-bottom`   — top / left / right only (Bras sits on the bottom margin).
  *  - `top-left`    — top / left only (Panties is the bottom-right corner).
- *  - `bottom-left` — bottom / left only (Nightdresses is the top-right corner).
+ *  - `bottom-left` — bottom / left only (Night suits is the top-right corner).
  */
 const SHADOW = {
   all: 'shadow-[0_4px_22px_-12px_rgba(46,42,38,0.16)] hover:shadow-[0_12px_30px_-18px_rgba(46,42,38,0.3)]',
@@ -33,7 +33,7 @@ const SHADOW = {
 }
 
 /**
- * The irregular gallery grid — one tall feature tile (Nightwear)
+ * The irregular gallery grid — one tall feature tile (Cordset)
  * plus three supporting tiles. The asymmetry is what stops this
  * reading as a stock 4-up category row.
  */
@@ -56,7 +56,10 @@ export default function CategoryGallery() {
       </Reveal>
 
       <div className="grid min-h-0 flex-1 gap-2.5 md:grid-cols-12 md:grid-rows-2">
-        {categories.map((cat, i) => (
+        {/* Only categories with a `span` are homepage gallery tiles. */}
+        {categories
+          .filter((cat) => cat.span)
+          .map((cat, i) => (
           <Reveal
             key={cat.id}
             as={Link}

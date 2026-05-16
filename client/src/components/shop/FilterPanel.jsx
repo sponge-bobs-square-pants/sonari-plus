@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
 
-const SIZES = ['XS', 'S', 'M', 'L', 'XL']
+// "For" options — the section is shown only for the kids category.
+const GENDERS = [
+  { id: 'all', label: 'Everyone' },
+  { id: 'boy', label: 'Boys' },
+  { id: 'girl', label: 'Girls' },
+]
 
 /* Price buckets — exported so ShopPage can use the min/max bounds.
    A bucket matches when:  min <= priceFrom < max  */
@@ -21,7 +26,8 @@ const SORTS = [
 ]
 
 // Category is decided by navigation (the URL), not by these filters.
-export const EMPTY_FILTERS = { sizes: [], price: 'all' }
+// `gender` only applies to the kids category.
+export const EMPTY_FILTERS = { sizes: [], price: 'all', gender: 'all' }
 
 function FilterSection({ label, children }) {
   return (
@@ -69,6 +75,8 @@ export default function FilterPanel({
   onSortChange,
   resultCount,
   activeCount,
+  sizeOptions = [],
+  showGender = false,
 }) {
   const [open, setOpen] = useState(false)
   const dockRef = useRef(null)
@@ -99,7 +107,10 @@ export default function FilterPanel({
         : [...filters.sizes, size],
     })
 
-  const hasActive = filters.sizes.length > 0 || filters.price !== 'all'
+  const hasActive =
+    filters.sizes.length > 0 ||
+    filters.price !== 'all' ||
+    filters.gender !== 'all'
 
   return (
     <div
@@ -122,9 +133,25 @@ export default function FilterPanel({
           </div>
 
           <div className="flex-1 overflow-y-auto px-6">
+            {showGender && (
+              <FilterSection label="For">
+                <div className="space-y-0.5">
+                  {GENDERS.map((g) => (
+                    <RadioRow
+                      key={g.id}
+                      checked={filters.gender === g.id}
+                      onClick={() => onChange({ ...filters, gender: g.id })}
+                    >
+                      {g.label}
+                    </RadioRow>
+                  ))}
+                </div>
+              </FilterSection>
+            )}
+
             <FilterSection label="Size">
               <div className="flex flex-wrap gap-2">
-                {SIZES.map((s) => {
+                {sizeOptions.map((s) => {
                   const on = filters.sizes.includes(s)
                   return (
                     <button

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose'
 
 /** Fixed storefront categories — products reference one of these ids. */
-export const CATEGORIES = ['nightwear', 'nightdresses', 'bras', 'panties']
+export const CATEGORIES = ['nightwear', 'nightdresses', 'bras', 'panties', 'kids']
 
 /**
  * One variant: a size within a colour, with its own price and stock.
@@ -57,6 +57,12 @@ const productSchema = new mongoose.Schema(
       enum: { values: CATEGORIES, message: '{VALUE} is not a valid category' },
     },
     fabric: { type: String, default: '', trim: true },
+    // Only meaningful for the `kids` category — empty for everything else.
+    gender: {
+      type: String,
+      enum: ['', 'boy', 'girl'],
+      default: '',
+    },
     // colour → sizes → { price, stock }. The whole variant tree.
     colors: { type: [colorSchema], default: [] },
     images: { type: [String], default: [] }, // Cloudinary secure URLs

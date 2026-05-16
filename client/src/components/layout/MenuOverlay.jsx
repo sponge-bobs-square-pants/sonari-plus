@@ -7,12 +7,8 @@ import AnnouncementBar from './AnnouncementBar'
 
 /* Primary nav = the shop categories + New In; secondary = brand pages. */
 const PRIMARY = [
-  ...categories.map((c) => ({
-    name: c.name,
-    count: `${c.count} styles`,
-    to: `/shop?category=${c.id}`,
-  })),
-  { name: 'New In', count: 'This week', to: '/shop' },
+  ...categories.map((c) => ({ name: c.name, to: `/shop?category=${c.id}` })),
+  { name: 'New In', to: '/shop' },
 ]
 const SECONDARY = ['Our story', 'Journal', 'Sustainability', 'Stockists', 'Contact us']
 
@@ -91,13 +87,10 @@ export default function MenuOverlay({ onClose, announcement = false }) {
                   <Link
                     to={item.to}
                     onClick={onClose}
-                    className="group flex items-baseline gap-4 py-1.5"
+                    className="group block py-1.5"
                   >
                     <span className="font-display text-[clamp(1.9rem,4.6vw,3rem)] font-light leading-tight tracking-tight transition-colors duration-300 group-hover:text-clay">
                       {item.name}
-                    </span>
-                    <span className="eyebrow text-[0.625rem] text-greige">
-                      {item.count}
                     </span>
                   </Link>
                 </li>

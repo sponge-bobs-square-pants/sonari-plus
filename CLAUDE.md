@@ -68,7 +68,8 @@ brainstorm; the exploration screens are the design references:
   route guards + `features/auth/authSlice.js`. `apiClient` sends `credentials:'include'`.
 - **Product model** → `server/src/models/Product.js`: `company` · `colors` →
   `sizes` → `{ price, stock }` · `images` · `featuredImage` (a dedicated
-  "New this week" cover). `totalStock` is a virtual. `priceFrom` is a **real,
+  "New this week" cover) · `gender` (`'' | 'boy' | 'girl'` — only set for the
+  `kids` category). `totalStock` is a virtual. `priceFrom` is a **real,
   indexed field** (denormalised from the variant tree) — virtuals can't be
   sorted or range-filtered in Mongo, and `/shop` needs both. Kept in sync by
   `pre('save')` + `pre('findOneAndUpdate')` hooks — never set it by hand.
@@ -76,10 +77,15 @@ brainstorm; the exploration screens are the design references:
 - **Image uploads**: `POST /api/upload` (admin only) → Cloudinary. The browser
   never sees the Cloudinary secret — uploads proxy through Express.
 - Redux store: `cart` + `auth` slices (`client/src/app/store.js`).
-- Categories are fixed site structure (`client/src/data/categories.js`), not data.
+- Categories are fixed site structure (`client/src/data/categories.js`), not
+  data. Five of them: Cordset · Night suits · Bras · Panties · Kids. Each
+  carries a `sizes` array (apparel = XS–XL, Kids = 8–16) — the single source
+  for the admin form's size toggles and the filter. A category with no `span`
+  (Kids) is shown in the menu/shop but is NOT a homepage gallery tile.
 - **Category is navigation, not a filter.** `/shop?category=<id>` (set by the
   menu + category tiles) scopes the shop; an unknown value shows everything.
-  The filter panel handles only size / price / sort.
+  The filter panel handles size / price / sort — plus a boy/girl `gender`
+  filter shown ONLY when browsing `kids` (gated by category in `ShopPage`).
 - The announcement bar is **home page only** (`<Header announcement />`).
   `Header` props: `solid` (force the solid state), `border`, `announcement`,
   `surface` (`'canvas'` default · `'white'` for the product page) — each page

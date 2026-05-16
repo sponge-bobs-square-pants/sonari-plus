@@ -1,5 +1,5 @@
 const COLUMNS = [
-  { title: 'Shop', items: ['Nightwear', 'Nightdresses', 'Bras', 'Panties', 'New In'] },
+  { title: 'Shop', items: ['Cordset', 'Night suits', 'Bras', 'Panties', 'New In'] },
   { title: 'Help', items: ['Size guide', 'Delivery & returns', 'Fabric care', 'Contact us'] },
   { title: 'Sonari', items: ['Our story', 'Sustainability', 'Stockists', 'Journal'] },
 ]
@@ -17,7 +17,7 @@ export default function Footer() {
               SONARI
             </p>
             <p className="mt-5 max-w-xs text-sm leading-relaxed text-canvas/55">
-              Modal and cotton sleepwear, nightdresses and intimates — made
+              Modal and cotton sleepwear, night suits and intimates — made
               for how you actually sleep.
             </p>
           </div>

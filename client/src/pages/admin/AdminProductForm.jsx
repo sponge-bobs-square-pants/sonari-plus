@@ -5,14 +5,12 @@ import {
   createProduct,
   updateProduct,
 } from '../../services/productApi'
-import { categories } from '../../data/categories'
+import { categories, sizesForCategory } from '../../data/categories'
 import TextField from '../../components/ui/TextField'
 import Button from '../../components/ui/Button'
 import AdminPageShell from '../../components/admin/AdminPageShell'
 import ImageManager from '../../components/admin/ImageManager'
 import SingleImageField from '../../components/admin/SingleImageField'
-
-const SIZES = ['XS', 'S', 'M', 'L', 'XL']
 
 const EMPTY = {
   name: '',
@@ -20,6 +18,7 @@ const EMPTY = {
   description: '',
   category: 'nightwear',
   fabric: '',
+  gender: '', // only used by the `kids` category
   tag: '',
   colors: [], // [{ name, hex, sizes: [{ size, price, stock }], images: [] }]
   images: [],
@@ -36,8 +35,9 @@ const variantInput =
   'h-9 w-20 border-b border-canvas/25 bg-transparent text-sm text-canvas ' +
   'focus:border-canvas focus:outline-none'
 
-/* ── One colour variant: name, swatch, sized/priced rows, images ── */
-function ColorBlock({ color, index, onChange, onRemove }) {
+/* ── One colour variant: name, swatch, sized/priced rows, images ──
+   `sizeOptions` is the size set for the product's category. */
+function ColorBlock({ color, index, sizeOptions, onChange, onRemove }) {
   const sizeEntry = (size) => color.sizes.find((s) => s.size === size)
 
   const toggleSize = (size) => {
@@ -92,7 +92,7 @@ function ColorBlock({ color, index, onChange, onRemove }) {
           Sizes · price · stock
         </span>
         <div className="mt-2 space-y-2">
-          {SIZES.map((size) => {
+          {sizeOptions.map((size) => {
             const entry = sizeEntry(size)
             const on = Boolean(entry)
             return (
@@ -182,6 +182,7 @@ export default function AdminProductForm() {
           description: p.description || '',
           category: p.category,
           fabric: p.fabric || '',
+          gender: p.gender || '',
           tag: p.tag || '',
           colors: p.colors || [],
           images: p.images || [],
@@ -197,6 +198,9 @@ export default function AdminProductForm() {
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }))
   const update = (e) => set(e.target.name, e.target.value)
+
+  // Size set follows the chosen category (apparel XS–XL vs kids 8–16).
+  const sizeOptions = sizesForCategory(form.category)
 
   /* ── Colours (each owns its variants and images) ── */
   const addColor = () =>
@@ -225,7 +229,9 @@ export default function AdminProductForm() {
     try {
       const payload = {
         ...form,
-        // drop blank colour rows; keep each colour's sizes ordered XS→XL
+        // gender is a kids-only attribute
+        gender: form.category === 'kids' ? form.gender : '',
+        // drop blank colour rows; keep each colour's sizes in size order
         colors: form.colors
           .filter((c) => c.name.trim())
           .map((c) => ({
@@ -238,7 +244,10 @@ export default function AdminProductForm() {
                 price: Number(s.price) || 0,
                 stock: Number(s.stock) || 0,
               }))
-              .sort((a, b) => SIZES.indexOf(a.size) - SIZES.indexOf(b.size)),
+              .sort(
+                (a, b) =>
+                  sizeOptions.indexOf(a.size) - sizeOptions.indexOf(b.size),
+              ),
           })),
       }
       if (isEdit) await updateProduct(id, payload)
@@ -335,6 +344,29 @@ export default function AdminProductForm() {
           </label>
         </div>
 
+        {/* Gender — kids only */}
+        {form.category === 'kids' && (
+          <label className="block">
+            <span className={fieldLabel}>For</span>
+            <select
+              name="gender"
+              value={form.gender}
+              onChange={update}
+              className={fieldClass}
+            >
+              <option value="" className="bg-ink text-canvas">
+                Select…
+              </option>
+              <option value="boy" className="bg-ink text-canvas">
+                Boys
+              </option>
+              <option value="girl" className="bg-ink text-canvas">
+                Girls
+              </option>
+            </select>
+          </label>
+        )}
+
         <TextField
           label="Fabric"
           name="fabric"
@@ -389,6 +421,7 @@ export default function AdminProductForm() {
                 key={i}
                 color={c}
                 index={i}
+                sizeOptions={sizeOptions}
                 onChange={setColorAt}
                 onRemove={removeColor}
               />

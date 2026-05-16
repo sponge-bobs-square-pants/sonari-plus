@@ -3,27 +3,34 @@ import nightdressesImage from '../assets/categories/category-nightdresses.png'
 import brasImage from '../assets/categories/category-bras.png'
 import pantiesImage from '../assets/categories/category-panties.png'
 
+// Size sets differ by category — apparel runs XS–XL, kids runs numeric.
+const APPAREL_SIZES = ['XS', 'S', 'M', 'L', 'XL']
+const KIDS_SIZES = ['8', '10', '12', '14', '16']
+
 /**
- * Homepage categories. `span` carries the Tailwind grid classes for
- * the irregular gallery layout (one tall feature tile + three supporting tiles).
- * `align` places the caption inside the tile so it lands on the photo's
- * empty space — defaults to bottom-left in CategoryGallery.
+ * Site categories — the single source for the menu, the shop, the admin
+ * form and the filters.
+ *
+ * `span` carries the Tailwind grid classes for the homepage gallery's
+ * irregular layout; a category WITHOUT `span` (e.g. Kids) is shown in the
+ * menu/shop but not as a homepage tile. `align` places the gallery tile's
+ * caption. `sizes` is the size set the admin form + filter offer.
  */
 export const categories = [
   {
     id: 'nightwear',
-    name: 'Nightwear',
+    name: 'Cordset',
     blurb: 'Slips, sets & robes',
-    count: 24,
+    sizes: APPAREL_SIZES,
     image: nightwearImage,
     span: 'md:col-span-5 md:row-span-2',
     shadowEdge: 'right',
   },
   {
     id: 'nightdresses',
-    name: 'Nightdresses',
+    name: 'Night suits',
     blurb: 'Long, short & between',
-    count: 18,
+    sizes: APPAREL_SIZES,
     image: nightdressesImage,
     span: 'md:col-span-7',
     align: 'top-right',
@@ -33,7 +40,7 @@ export const categories = [
     id: 'bras',
     name: 'Bras',
     blurb: 'Soft-cup & wireless',
-    count: 31,
+    sizes: APPAREL_SIZES,
     image: brasImage,
     span: 'md:col-span-4',
     shadowEdge: 'no-bottom',
@@ -42,10 +49,21 @@ export const categories = [
     id: 'panties',
     name: 'Panties',
     blurb: 'Everyday essentials',
-    count: 27,
+    sizes: APPAREL_SIZES,
     image: pantiesImage,
     span: 'md:col-span-3',
     align: 'bottom-right',
     shadowEdge: 'top-left',
   },
+  {
+    // No `span` → menu + shop only, not a homepage gallery tile.
+    id: 'kids',
+    name: 'Kids',
+    blurb: 'Boys & girls',
+    sizes: KIDS_SIZES,
+  },
 ]
+
+/** The size set for a category id — falls back to apparel sizes. */
+export const sizesForCategory = (id) =>
+  categories.find((c) => c.id === id)?.sizes ?? APPAREL_SIZES
