@@ -5,6 +5,7 @@ import { loadUser } from './features/auth/authSlice'
 import LandingPage from './pages/LandingPage'
 import ShopPage from './pages/ShopPage'
 import ProductPage from './pages/ProductPage'
+import CartPage from './pages/CartPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import AccountPage from './pages/AccountPage'
@@ -32,6 +33,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/shop" element={<ShopPage />} />
         <Route path="/product/:id" element={<ProductPage />} />
+        <Route path="/cart" element={<CartPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route

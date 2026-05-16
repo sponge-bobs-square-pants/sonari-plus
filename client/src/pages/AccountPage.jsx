@@ -2,17 +2,11 @@ import { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { logout, selectAuthUser } from '../features/auth/authSlice'
-import {
-  selectCartItems,
-  selectCartTotal,
-  removeItem,
-} from '../features/cart/cartSlice'
 import Icon from '../components/ui/Icon'
 import Button from '../components/ui/Button'
-import Placeholder from '../components/ui/Placeholder'
-import { formatPrice } from '../utils/format'
 
-const TABS = ['Purchases', 'Favourites', 'Cart', 'My details']
+// The bag has its own page (/cart) — the account area no longer tabs it.
+const TABS = ['Purchases', 'Favourites', 'My details']
 
 /* ── Shared empty-state block ─────────────────── */
 function EmptyState({ icon, title, body }) {
@@ -49,67 +43,6 @@ function Favourites() {
   )
 }
 
-function Cart() {
-  const items = useSelector(selectCartItems)
-  const total = useSelector(selectCartTotal)
-  const dispatch = useDispatch()
-
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        icon="bag"
-        title="Your cart is empty"
-        body="Pieces you add to your cart will gather here, ready for checkout."
-      />
-    )
-  }
-
-  return (
-    <div className="max-w-xl">
-      <ul className="divide-y divide-linen border-y border-linen">
-        {items.map((item) => (
-          <li key={item.lineId} className="flex items-center gap-4 py-4">
-            <Placeholder
-              src={item.image || undefined}
-              tone="mid"
-              mark={false}
-              className="h-24 w-20 shrink-0"
-            />
-            <div className="flex-1">
-              <h3 className="font-display text-base font-normal text-ink">
-                {item.name}
-              </h3>
-              <p className="eyebrow mt-1 text-[0.5625rem] text-clay">
-                {item.color} · {item.size}
-              </p>
-              <p className="mt-1 text-sm text-clay">
-                {formatPrice(item.price)} · Qty {item.quantity}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => dispatch(removeItem(item.lineId))}
-              className="eyebrow cursor-pointer text-clay transition-colors hover:text-dusk"
-            >
-              Remove
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-6 flex items-center justify-between">
-        <span className="eyebrow text-clay">Total</span>
-        <span className="font-display text-xl font-light text-ink">
-          {formatPrice(total)}
-        </span>
-      </div>
-      <Button variant="solid" className="mt-6 w-full">
-        Checkout
-      </Button>
-    </div>
-  )
-}
-
 function DetailRow({ label, value }) {
   return (
     <div className="flex items-center justify-between py-4">
@@ -134,7 +67,6 @@ function MyDetails({ user }) {
 const PANELS = {
   Purchases,
   Favourites,
-  Cart,
   'My details': MyDetails,
 }
 

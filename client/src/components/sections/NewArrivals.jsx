@@ -29,10 +29,9 @@ export default function NewArrivals() {
   const [products, setProducts] = useState([])
 
   useEffect(() => {
-    listProducts()
-      .then((all) =>
-        setProducts(all.filter((p) => p.tag === 'New').slice(0, 4)),
-      )
+    // Server-side: newest four products tagged "New".
+    listProducts({ tag: 'New', sort: 'newest', limit: 4 })
+      .then((res) => setProducts(res.products))
       .catch(() => {})
   }, [])
 

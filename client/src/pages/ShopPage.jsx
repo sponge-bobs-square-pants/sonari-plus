@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { listProducts } from '../services/productApi'
 import { categories } from '../data/categories'
@@ -7,10 +7,13 @@ import Footer from '../components/layout/Footer'
 import ProductCard from '../components/product/ProductCard'
 import Reveal from '../components/ui/Reveal'
 import Button from '../components/ui/Button'
-import FilterModal, {
+import FilterPanel, {
   PRICE_BUCKETS,
   EMPTY_FILTERS,
-} from '../components/shop/FilterModal'
+} from '../components/shop/FilterPanel'
+
+// Products fetched per page. The server caps the limit it honours.
+const PAGE_SIZE = 24
 
 export default function ShopPage() {
   const [searchParams] = useSearchParams()
@@ -18,56 +21,112 @@ export default function ShopPage() {
   // category tiles. An unknown value resolves to null = show all.
   const activeCategory =
     categories.find((c) => c.id === searchParams.get('category')) || null
+  const activeCategoryId = activeCategory?.id ?? null
 
-  const [products, setProducts] = useState([])
-  const [status, setStatus] = useState('loading') // loading | ready | error
-  const [error, setError] = useState('')
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [sort, setSort] = useState('newest')
-  const [filterOpen, setFilterOpen] = useState(false)
 
+  const [products, setProducts] = useState([]) // accumulated across pages
+  const [status, setStatus] = useState('loading') // loading | ready | error
+  const [error, setError] = useState('')
+  const [total, setTotal] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [moreError, setMoreError] = useState(false)
+
+  const sentinelRef = useRef(null)
+  // reqId tags every fetch: when filters change mid-flight the id moves
+  // on, so the stale response is recognised and dropped.
+  const reqIdRef = useRef(0)
+  const pageRef = useRef(1)
+  const loadingMoreRef = useRef(false)
+
+  const activeCount = filters.sizes.length + (filters.price !== 'all' ? 1 : 0)
+
+  // Translate the UI state into the API's query params. Memoised so it
+  // changes identity ONLY when a real query input changes — which is
+  // exactly when the page-1 fetch below should re-run.
+  const buildParams = useCallback(
+    (page) => {
+      const bucket = PRICE_BUCKETS.find((b) => b.id === filters.price)
+      return {
+        page,
+        limit: PAGE_SIZE,
+        category: activeCategoryId ?? undefined,
+        sizes: filters.sizes,
+        priceMin: bucket?.min,
+        priceMax: bucket?.max,
+        sort,
+      }
+    },
+    [activeCategoryId, filters, sort],
+  )
+
+  // ── Page 1: runs on mount and whenever the query changes ──
+  // Refetching from the server is the whole point — at tens of
+  // thousands of products the client can't filter/sort locally.
   useEffect(() => {
-    listProducts()
-      .then((all) => {
-        setProducts(all)
+    const id = ++reqIdRef.current
+    pageRef.current = 1
+    loadingMoreRef.current = false
+    setStatus('loading')
+    setError('')
+    setMoreError(false)
+    setProducts([])
+
+    listProducts(buildParams(1))
+      .then((res) => {
+        if (id !== reqIdRef.current) return // a newer query superseded us
+        setProducts(res.products)
+        setTotal(res.total)
+        setHasMore(res.hasMore)
         setStatus('ready')
       })
       .catch((err) => {
+        if (id !== reqIdRef.current) return
         setError(err.message)
         setStatus('error')
       })
-  }, [])
+  }, [buildParams])
 
-  // Filtered + sorted list — recomputed only when an input changes.
-  const visible = useMemo(() => {
-    const bucket = PRICE_BUCKETS.find((b) => b.id === filters.price)
+  // ── Next page: append, don't replace ──
+  const loadMore = useCallback(() => {
+    if (loadingMoreRef.current) return
+    loadingMoreRef.current = true
+    setMoreError(false)
+    const id = reqIdRef.current
+    const next = pageRef.current + 1
 
-    let list = products.filter((p) => {
-      if (activeCategory && p.category !== activeCategory.id) return false
-      if (filters.sizes.length) {
-        const sizes = (p.colors || []).flatMap((c) =>
-          c.sizes.map((s) => s.size),
-        )
-        if (!filters.sizes.some((s) => sizes.includes(s))) return false
-      }
-      if (bucket && (bucket.min != null || bucket.max != null)) {
-        const price = p.priceFrom ?? 0
-        if (bucket.min != null && price < bucket.min) return false
-        if (bucket.max != null && price >= bucket.max) return false
-      }
-      return true
-    })
+    listProducts(buildParams(next))
+      .then((res) => {
+        if (id !== reqIdRef.current) return // query changed — drop the page
+        pageRef.current = next
+        setProducts((prev) => [...prev, ...res.products])
+        setHasMore(res.hasMore)
+      })
+      .catch(() => {
+        if (id === reqIdRef.current) setMoreError(true)
+      })
+      .finally(() => {
+        if (id === reqIdRef.current) loadingMoreRef.current = false
+      })
+  }, [buildParams])
 
-    if (sort === 'price-asc') {
-      list = [...list].sort((a, b) => (a.priceFrom ?? 0) - (b.priceFrom ?? 0))
-    } else if (sort === 'price-desc') {
-      list = [...list].sort((a, b) => (b.priceFrom ?? 0) - (a.priceFrom ?? 0))
-    }
-    return list
-  }, [products, activeCategory, filters, sort])
-
-  // Number of active filters — shown on the floating button.
-  const activeCount = filters.sizes.length + (filters.price !== 'all' ? 1 : 0)
+  // Watch a sentinel below the grid; when it nears the viewport, fetch
+  // the next page. Rebuilt after each append (products.length dep) so
+  // it re-checks intersection and keeps tall viewports filling.
+  useEffect(() => {
+    if (status !== 'ready' || !hasMore || moreError) return
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMore()
+      },
+      { rootMargin: '600px' }, // prefetch before the sentinel is on screen
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [status, hasMore, moreError, loadMore, products.length])
 
   return (
     <>
@@ -81,29 +140,18 @@ export default function ShopPage() {
 
           {status === 'error' && <p className="text-sm text-dusk">{error}</p>}
 
-          {/* No products in the catalogue at all */}
-          {status === 'ready' && products.length === 0 && (
+          {/* Nothing came back for this query */}
+          {status === 'ready' && total === 0 && (
             <div className="border-y border-linen py-24 text-center">
               <p className="font-display text-2xl font-light text-ink">
-                Nothing here yet
+                {activeCount > 0 ? 'No matches' : 'Nothing here yet'}
               </p>
               <p className="mt-2 text-sm text-clay">
-                New pieces are on their way — check back soon.
+                {activeCount > 0
+                  ? 'Nothing fits those filters — try clearing a few.'
+                  : 'New pieces are on their way — check back soon.'}
               </p>
-            </div>
-          )}
-
-          {/* Products exist, but filters/category exclude them all */}
-          {status === 'ready' &&
-            products.length > 0 &&
-            visible.length === 0 && (
-              <div className="border-y border-linen py-20 text-center">
-                <p className="font-display text-2xl font-light text-ink">
-                  No matches
-                </p>
-                <p className="mt-2 text-sm text-clay">
-                  Nothing fits those filters — try clearing a few.
-                </p>
+              {activeCount > 0 && (
                 <Button
                   onClick={() => setFilters(EMPTY_FILTERS)}
                   variant="outline"
@@ -111,42 +159,52 @@ export default function ShopPage() {
                 >
                   Clear filters
                 </Button>
-              </div>
-            )}
-
-          {status === 'ready' && visible.length > 0 && (
-            <div className="grid grid-cols-2 gap-x-5 gap-y-12 md:grid-cols-3 lg:grid-cols-4">
-              {visible.map((p, i) => (
-                <Reveal key={p._id} delay={(i % 4) * 80}>
-                  <ProductCard product={p} />
-                </Reveal>
-              ))}
+              )}
             </div>
+          )}
+
+          {status === 'ready' && total > 0 && (
+            <>
+              <div className="grid grid-cols-2 gap-x-5 gap-y-12 md:grid-cols-3 lg:grid-cols-4">
+                {products.map((p, i) => (
+                  <Reveal key={p._id} delay={(i % 4) * 80} instantInView>
+                    <ProductCard product={p} />
+                  </Reveal>
+                ))}
+              </div>
+
+              {/* Sentinel — its arrival near the viewport loads the next page */}
+              {hasMore && (
+                <div ref={sentinelRef} className="flex justify-center pt-16">
+                  {moreError ? (
+                    <button
+                      type="button"
+                      onClick={loadMore}
+                      className="eyebrow cursor-pointer text-dusk transition-colors hover:text-ink"
+                    >
+                      Couldn’t load more — retry
+                    </button>
+                  ) : (
+                    <span className="eyebrow text-clay">Loading more…</span>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>
 
-      {/* Sticky filter button — always visible while browsing */}
-      <button
-        type="button"
-        onClick={() => setFilterOpen(true)}
-        className="eyebrow fixed bottom-8 left-1/2 z-40 -translate-x-1/2 cursor-pointer rounded-full bg-ink px-7 py-4 text-canvas shadow-[0_16px_40px_-12px_rgba(46,42,38,0.5)] transition-colors hover:bg-clay"
-      >
-        Filter{activeCount > 0 ? ` · ${activeCount}` : ''}
-      </button>
-
       <Footer />
 
-      {filterOpen && (
-        <FilterModal
-          filters={filters}
-          onChange={setFilters}
-          sort={sort}
-          onSortChange={setSort}
-          resultCount={visible.length}
-          onClose={() => setFilterOpen(false)}
-        />
-      )}
+      {/* Filter dock — a chat-widget panel pinned bottom-right */}
+      <FilterPanel
+        filters={filters}
+        onChange={setFilters}
+        sort={sort}
+        onSortChange={setSort}
+        resultCount={total}
+        activeCount={activeCount}
+      />
     </>
   )
 }

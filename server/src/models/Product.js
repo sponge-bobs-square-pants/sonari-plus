@@ -68,6 +68,10 @@ const productSchema = new mongoose.Schema(
       enum: ['', 'New', 'Bestseller'],
       default: '',
     },
+    // Cheapest variant price, DENORMALISED from colors[].sizes[].price so
+    // MongoDB can index, sort & range-filter on it (a virtual cannot be
+    // indexed). Kept in sync by the hooks below — never set this by hand.
+    priceFrom: { type: Number, default: 0 },
   },
   { timestamps: true },
 )
@@ -82,11 +86,40 @@ productSchema.virtual('totalStock').get(function () {
   return allVariants(this).reduce((sum, v) => sum + (v.stock || 0), 0)
 })
 
-// Headline price — the cheapest variant ("from £X" on the storefront).
-productSchema.virtual('priceFrom').get(function () {
-  const prices = allVariants(this).map((v) => v.price)
+/** Cheapest variant price across the whole colour × size grid. */
+function lowestPrice(colors = []) {
+  const prices = colors.flatMap((c) => (c.sizes || []).map((s) => s.price))
   return prices.length ? Math.min(...prices) : 0
+}
+
+// Keep the denormalised `priceFrom` in sync with the variant tree.
+// `save` covers Product.create(); `findOneAndUpdate` covers the admin
+// PUT (findByIdAndUpdate) — that path skips document middleware, so it
+// needs its own hook reading the pending update. Both are synchronous
+// (promise-style) hooks — no `next` callback.
+productSchema.pre('save', function () {
+  this.priceFrom = lowestPrice(this.colors)
 })
+
+productSchema.pre('findOneAndUpdate', function () {
+  const update = this.getUpdate() || {}
+  const colors = update.colors ?? update.$set?.colors
+  if (colors) {
+    const priceFrom = lowestPrice(colors)
+    if (update.$set) update.$set.priceFrom = priceFrom
+    else update.priceFrom = priceFrom
+  }
+})
+
+// Indexes backing the storefront's filter + sort + paginate queries.
+// Compound indexes pair the most common filter (category) with each
+// sort key so MongoDB can satisfy both from one index.
+productSchema.index({ category: 1, createdAt: -1 })
+productSchema.index({ category: 1, priceFrom: 1 })
+productSchema.index({ createdAt: -1 })
+productSchema.index({ priceFrom: 1 })
+productSchema.index({ tag: 1 })
+productSchema.index({ 'colors.sizes.size': 1 })
 
 // Include virtuals in API responses; drop the internal version key.
 productSchema.set('toJSON', {

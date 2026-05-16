@@ -88,7 +88,10 @@ export default function ProductPage() {
         productId: product._id,
         name: product.name,
         company: product.company,
-        image: gallery[0] || '',
+        // The cover photo (same one the shop grid shows), not the
+        // selected colour's variant shot.
+        image:
+          product.images?.[0] || product.colors?.[0]?.images?.[0] || '',
         color: color.name,
         hex: color.hex,
         size,

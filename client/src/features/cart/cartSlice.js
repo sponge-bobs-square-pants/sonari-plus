@@ -1,7 +1,12 @@
 import { createSlice } from '@reduxjs/toolkit'
+import { logout } from '../auth/authSlice'
+import { readCart } from './cartStorage'
 
+// Hydrate from the guest store so a signed-out visitor's bag survives
+// a refresh. If they turn out to be signed in, the merge-on-login
+// listener replaces this with their DB cart shortly after boot.
 const initialState = {
-  items: [],
+  items: readCart(),
 }
 
 /**
@@ -48,10 +53,23 @@ const cartSlice = createSlice({
     clearCart: (state) => {
       state.items = []
     },
+
+    // payload: items[] — replace the whole cart, e.g. after a DB sync.
+    setCart: (state, action) => {
+      state.items = Array.isArray(action.payload) ? action.payload : []
+    },
+  },
+
+  // The bag belongs to the signed-in session — empty it on logout so
+  // the next person doesn't inherit the previous user's cart.
+  extraReducers: (builder) => {
+    builder.addCase(logout.fulfilled, (state) => {
+      state.items = []
+    })
   },
 })
 
-export const { addItem, removeItem, updateQuantity, clearCart } =
+export const { addItem, removeItem, updateQuantity, clearCart, setCart } =
   cartSlice.actions
 
 /* ── Selectors ────────────────────────────────── */

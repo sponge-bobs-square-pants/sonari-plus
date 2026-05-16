@@ -44,8 +44,10 @@ brainstorm; the exploration screens are the design references:
 ## Conventions
 
 - Prices: always `formatPrice()` from `client/src/utils/format.js` — INR, "₹ 849".
-- India-only shipping; free delivery over ₹2,000 (currently copy in
-  `AnnouncementBar`; becomes real logic at checkout — make ₹2,000 a constant then).
+- India-only shipping; free delivery at/over ₹2,000 → `FREE_DELIVERY_THRESHOLD`
+  in `client/src/data/shipping.js` (the single source of truth — used by the
+  cart page, and by checkout when built). `AnnouncementBar` copy still hardcodes
+  the figure; point it at the constant if that bar ever goes dynamic.
 - **No fake/sample product data on the storefront.** Use placeholder *states*
   instead — see `client/src/components/sections/NewArrivals.jsx` (it shows tonal
   placeholder cards when no products are tagged "New"). Real data comes from the DB.
@@ -66,21 +68,26 @@ brainstorm; the exploration screens are the design references:
   route guards + `features/auth/authSlice.js`. `apiClient` sends `credentials:'include'`.
 - **Product model** → `server/src/models/Product.js`: `company` · `colors` →
   `sizes` → `{ price, stock }` · `images` · `featuredImage` (a dedicated
-  "New this week" cover). `totalStock` and `priceFrom` are virtuals.
+  "New this week" cover). `totalStock` is a virtual. `priceFrom` is a **real,
+  indexed field** (denormalised from the variant tree) — virtuals can't be
+  sorted or range-filtered in Mongo, and `/shop` needs both. Kept in sync by
+  `pre('save')` + `pre('findOneAndUpdate')` hooks — never set it by hand.
+  Existing rows: `cd server && npm run backfill:price` (one-off).
 - **Image uploads**: `POST /api/upload` (admin only) → Cloudinary. The browser
   never sees the Cloudinary secret — uploads proxy through Express.
 - Redux store: `cart` + `auth` slices (`client/src/app/store.js`).
 - Categories are fixed site structure (`client/src/data/categories.js`), not data.
 - **Category is navigation, not a filter.** `/shop?category=<id>` (set by the
   menu + category tiles) scopes the shop; an unknown value shows everything.
-  The filter modal handles only size / price / sort.
+  The filter panel handles only size / price / sort.
 - The announcement bar is **home page only** (`<Header announcement />`).
-  `Header` props: `solid` (force the ink-on-canvas state), `border`,
-  `announcement` — each page composes what it needs.
+  `Header` props: `solid` (force the solid state), `border`, `announcement`,
+  `surface` (`'canvas'` default · `'white'` for the product page) — each page
+  composes what it needs.
 
 ## Roles
 
-- `user` → `/account` — Purchases · Favourites · Cart · My details (tabbed sidebar)
+- `user` → `/account` — Purchases · Favourites · My details (tabbed sidebar)
 - `admin` → `/admin` — dashboard hub: "Manage products" · "Configure landing page"
   (admins hitting `/account` are redirected to `/admin`)
 
@@ -90,12 +97,48 @@ Landing page · auth (login / signup) · account area · admin panel (product CR
 with Cloudinary image uploads, variant model) · single product page
 (`/product/:id`) with colour/size selection + add-to-cart.
 
+Cart page (`/cart`) — two columns: a grid of small item cards on the left
+(scrolls within itself past ~2 rows) and a checkout summary panel on the right
+(total + free-delivery progress + not-yet-wired Checkout button). Thumbnails use
+each product's live cover (`getProduct` lookup), not the stored snapshot image.
+The Header bag icon links here; it's the only cart UI (the `/account` area no
+longer has a Cart tab).
+
 Shop browsing page (`/shop`) — full-width product grid, category scoped by the
-URL, and a floating button that opens a filter modal (size / price / sort).
-See `client/src/components/shop/FilterModal.jsx`.
+URL. Filtering uses a chat-widget-style dock pinned bottom-right: a pill
+launcher with a panel that expands above it — no backdrop, no scroll lock, the
+grid stays live as you filter. See `client/src/components/shop/FilterPanel.jsx`.
+
+`/shop` uses **server-side pagination + infinite scroll** (the catalogue is
+expected to reach tens of thousands of products):
+- `GET /api/products` is paginated and does ALL filtering/sorting in Mongo.
+  Params: `page` · `limit` (max 60) · `category` · `tag` · `sizes` (CSV) ·
+  `priceMin` / `priceMax` · `sort` (`newest` | `price-asc` | `price-desc`).
+  Responds `{ products, page, totalPages, total, hasMore }`.
+- `client/src/services/productApi.js` → `listProducts(params)` returns the
+  **whole envelope** (not just `.products`) — callers need `total` / `hasMore`.
+- `ShopPage` refetches page 1 whenever category/filters/sort change, and an
+  IntersectionObserver sentinel appends later pages. A `reqId` ref discards
+  responses from a superseded query.
+- `AdminProductsPage` uses the same endpoint — category tabs, a debounced
+  name search (server `?search=`), and a "Load more" button.
+- Skip/limit pagination is fine here; switch to cursor-based only if very deep
+  scrolling becomes common.
 
 The `cart` slice is fully working — a cart line is keyed by product + colour +
 size (`lineId`); see `client/src/features/cart/cartSlice.js`.
+
+**Cart persistence.** The Redux `cart` slice is the live source the UI reads;
+a listener middleware (`features/cart/cartListener.js`, prepended in
+`app/store.js`) mirrors it to the right store:
+- **Signed out** → localStorage (`cartStorage.js`), so the bag survives refresh.
+- **Signed in** → the DB (`Cart` model, one doc per user). `GET/PUT /api/cart`
+  + `POST /api/cart/merge`, all behind `protect`. `PUT` replaces the cart
+  wholesale (debounced 450ms); the controller stores item *snapshots*, so
+  checkout must re-validate price/stock against the live Product.
+- **On sign-in** (loadUser/login/register fulfilled) the guest bag is merged
+  into the DB cart and localStorage cleared. **On logout** Redux + localStorage
+  are emptied; the DB cart stays for next time.
 
 ## Next steps
 

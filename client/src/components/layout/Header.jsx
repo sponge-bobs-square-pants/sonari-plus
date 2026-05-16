@@ -78,20 +78,6 @@ export default function Header({
 
             {/* Right — utilities */}
             <div className="flex items-center justify-end gap-5">
-              <button
-                type="button"
-                className="hidden cursor-pointer opacity-80 hover:opacity-100 sm:block"
-                aria-label="Search"
-              >
-                <Icon name="search" />
-              </button>
-              <button
-                type="button"
-                className="hidden cursor-pointer opacity-80 hover:opacity-100 sm:block"
-                aria-label="Wishlist"
-              >
-                <Icon name="heart" />
-              </button>
               <Link
                 to={
                   user
@@ -105,9 +91,9 @@ export default function Header({
               >
                 <Icon name="user" />
               </Link>
-              <button
-                type="button"
-                className="relative cursor-pointer opacity-80 hover:opacity-100"
+              <Link
+                to="/cart"
+                className="relative cursor-pointer opacity-80 transition-opacity hover:opacity-100"
                 aria-label={`Bag, ${cartCount} items`}
               >
                 <Icon name="bag" />
@@ -116,7 +102,7 @@ export default function Header({
                     {cartCount}
                   </span>
                 )}
-              </button>
+              </Link>
             </div>
           </div>
         </nav>

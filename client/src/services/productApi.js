@@ -1,12 +1,31 @@
 import { api } from './apiClient'
 
-/* Product API calls. Each unwraps the server's response envelope
-   so callers get the bare product / list. */
+/* Product API calls. Single-product calls unwrap the envelope; the
+   list call keeps it — callers need page / total for pagination. */
 
-export const listProducts = (category) =>
-  api
-    .get(category ? `/products?category=${category}` : '/products')
-    .then((d) => d.products)
+/**
+ * GET /api/products — paginated list.
+ *
+ * @param {object} params - { page, limit, category, sizes (array),
+ *   priceMin, priceMax, sort, tag, search } — all optional.
+ * @returns {Promise<{ products, page, totalPages, total, hasMore }>}
+ */
+export const listProducts = (params = {}) => {
+  const { page, limit, category, sizes, priceMin, priceMax, sort, tag, search } =
+    params
+  const qs = new URLSearchParams()
+  if (page) qs.set('page', page)
+  if (limit) qs.set('limit', limit)
+  if (category) qs.set('category', category)
+  if (sizes?.length) qs.set('sizes', sizes.join(','))
+  if (priceMin != null) qs.set('priceMin', priceMin)
+  if (priceMax != null) qs.set('priceMax', priceMax)
+  if (sort) qs.set('sort', sort)
+  if (tag) qs.set('tag', tag)
+  if (search) qs.set('search', search)
+  const q = qs.toString()
+  return api.get(q ? `/products?${q}` : '/products')
+}
 
 export const getProduct = (id) =>
   api.get(`/products/${id}`).then((d) => d.product)
