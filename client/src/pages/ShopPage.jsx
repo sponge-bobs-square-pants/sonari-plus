@@ -175,9 +175,14 @@ export default function ShopPage() {
 
           {status === 'ready' && total > 0 && (
             <>
-              <div className="grid grid-cols-2 gap-x-5 gap-y-12 md:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 justify-items-center gap-x-6 gap-y-14 md:grid-cols-3 md:gap-x-10 lg:grid-cols-4 lg:gap-x-12 lg:gap-y-16">
                 {products.map((p, i) => (
-                  <Reveal key={p._id} delay={(i % 4) * 80} instantInView>
+                  <Reveal
+                    key={p._id}
+                    delay={(i % 4) * 80}
+                    instantInView
+                    className="w-full max-w-52"
+                  >
                     <ProductCard product={p} />
                   </Reveal>
                 ))}
