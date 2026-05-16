@@ -9,6 +9,15 @@ import AnnouncementBar from './AnnouncementBar'
 import MenuOverlay from './MenuOverlay'
 
 /**
+ * The solid (scrolled / forced) background, matched to the page's
+ * surface — storefront pages are `canvas`, the product page is white.
+ */
+const SOLID_BG = {
+  canvas: 'bg-canvas/95',
+  white: 'bg-white/95',
+}
+
+/**
  * Three-zone header: menu button (left) · wordmark (center) ·
  * utilities (right). All navigation now lives in the full-screen
  * MenuOverlay, so the bar itself stays minimal at every width.
@@ -17,6 +26,7 @@ export default function Header({
   solid = false,
   border = true,
   announcement = false,
+  surface = 'canvas',
 }) {
   const scrolled = useScrolled(80)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -36,7 +46,9 @@ export default function Header({
         <nav
           className={`transition-colors duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${tone} ${
             isSolid
-              ? `${border ? 'border-b border-linen ' : ''}bg-canvas/95 backdrop-blur-md`
+              ? `${border ? 'border-b border-linen ' : ''}${
+                  SOLID_BG[surface] ?? SOLID_BG.canvas
+                } backdrop-blur-md`
               : 'bg-transparent'
           }`}
         >

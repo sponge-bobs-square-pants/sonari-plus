@@ -8,7 +8,7 @@
 ─────────────────────────────────────────────── */
 @theme {
   /* Warm tonal scale — the black / white / dull-faded brief */
-  --color-canvas: #fbfaf7; /* page background, warm near-white   */
+  --color-canvas: #fbfaf6; /* page background, warm near-white   */
   --color-oat: #eae6df; /* alternating sections, panels        */
   --color-linen: #e4ded4; /* borders, dividers                   */
   --color-greige: #c9c1b6; /* faint UI, disabled states           */

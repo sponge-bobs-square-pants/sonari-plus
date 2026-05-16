@@ -3,6 +3,36 @@ import { categories } from '../../data/categories'
 import Reveal from '../ui/Reveal'
 
 /**
+ * Where each tile's caption sits — chosen per category so the text
+ * lands on the photo's quiet space, not on the garment.
+ */
+const ALIGN = {
+  'bottom-left': 'justify-end items-start text-left',
+  'top-right': 'justify-start items-end text-right',
+  'bottom-right': 'justify-end items-end text-right',
+}
+
+/**
+ * Tile shadow, kept off the section's outer margins per tile:
+ *  - `all`         — lifts the whole card (interior tiles).
+ *  - `right`       — glow on the inner edge only (tall Nightwear tile).
+ *  - `no-bottom`   — top / left / right only (Bras sits on the bottom margin).
+ *  - `top-left`    — top / left only (Panties is the bottom-right corner).
+ *  - `bottom-left` — bottom / left only (Nightdresses is the top-right corner).
+ */
+const SHADOW = {
+  all: 'shadow-[0_4px_22px_-12px_rgba(46,42,38,0.16)] hover:shadow-[0_12px_30px_-18px_rgba(46,42,38,0.3)]',
+  right:
+    'shadow-[24px_0_24px_-30px_rgba(46,42,38,0.34)] hover:shadow-[28px_0_26px_-32px_rgba(46,42,38,0.4)]',
+  'no-bottom':
+    'shadow-[0_-12px_24px_-16px_rgba(46,42,38,0.2)] hover:shadow-[0_-15px_26px_-18px_rgba(46,42,38,0.3)]',
+  'top-left':
+    'shadow-[-12px_-12px_24px_-16px_rgba(46,42,38,0.2)] hover:shadow-[-15px_-15px_26px_-18px_rgba(46,42,38,0.3)]',
+  'bottom-left':
+    'shadow-[-12px_12px_24px_-16px_rgba(46,42,38,0.2)] hover:shadow-[-15px_15px_26px_-18px_rgba(46,42,38,0.3)]',
+}
+
+/**
  * The irregular gallery grid — one tall feature tile (Nightwear)
  * plus three supporting tiles. The asymmetry is what stops this
  * reading as a stock 4-up category row.
@@ -25,14 +55,16 @@ export default function CategoryGallery() {
         </Link>
       </Reveal>
 
-      <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-12 md:grid-rows-2">
+      <div className="grid min-h-0 flex-1 gap-2.5 md:grid-cols-12 md:grid-rows-2">
         {categories.map((cat, i) => (
           <Reveal
             key={cat.id}
             as={Link}
             to={`/shop?category=${cat.id}`}
             delay={i * 90}
-            className={`group relative block h-72 overflow-hidden md:h-auto ${cat.span}`}
+            className={`group relative block h-72 overflow-hidden bg-canvas transition-shadow duration-[600ms] ease-[cubic-bezier(0.22,0.61,0.36,1)] md:h-auto ${
+              SHADOW[cat.shadowEdge] ?? SHADOW.all
+            } ${cat.span}`}
           >
             <img
               src={cat.image}
@@ -40,13 +72,16 @@ export default function CategoryGallery() {
               loading="lazy"
               className="h-full w-full object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.22,0.61,0.36,1)] group-hover:scale-[1.06]"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-ink/60 via-ink/5 to-transparent" />
-            <div className="absolute inset-0 flex flex-col justify-end p-7 text-canvas">
+            <div
+              className={`absolute inset-0 flex flex-col p-7 text-ink ${
+                ALIGN[cat.align] ?? ALIGN['bottom-left']
+              }`}
+            >
               <h3 className="font-display text-2xl font-light md:text-[1.75rem]">
                 {cat.name}
               </h3>
-              <span className="eyebrow mt-4 inline-flex items-center gap-2 text-[0.625rem] text-canvas/80">
-                <span className="h-px w-6 bg-canvas/50 transition-all duration-500 group-hover:w-10 group-hover:bg-dusk" />
+              <span className="eyebrow mt-4 inline-flex items-center gap-2 text-[0.625rem] text-ink/70">
+                <span className="h-px w-6 bg-ink/40 transition-all duration-500 group-hover:w-10 group-hover:bg-dusk" />
                 Shop now
               </span>
             </div>

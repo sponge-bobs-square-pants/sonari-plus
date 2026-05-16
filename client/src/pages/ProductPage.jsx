@@ -51,7 +51,7 @@ export default function ProductPage() {
   if (status !== 'ready') {
     return (
       <>
-        <Header solid />
+        <Header solid surface="white" border={false} />
         <main className="flex min-h-screen items-center justify-center bg-white pt-24">
           <p className={`text-sm ${status === 'error' ? 'text-dusk' : 'text-clay'}`}>
             {status === 'error' ? error : 'Loading…'}
@@ -102,12 +102,12 @@ export default function ProductPage() {
 
   return (
     <>
-      <Header solid />
+      <Header solid surface="white" border={false} />
 
       <main className="min-h-screen bg-white px-6 pb-24 pt-24">
-        <div className="flex flex-col gap-12 lg:flex-row lg:items-start lg:gap-16">
+        <div className="flex flex-col gap-12 lg:flex-row lg:items-start lg:gap-24">
           {/* ── Gallery — fixed width; thumbnail rail beside the image ── */}
-          <div className="flex flex-col gap-3 lg:w-[35rem] lg:shrink-0 lg:flex-row lg:gap-4">
+          <div className="flex flex-col gap-3 lg:w-[35rem] lg:shrink-0 lg:flex-row lg:gap-7">
             {/* Thumbnails: a row below on mobile, a left rail on desktop */}
             {gallery.length > 1 && (
               <div className="order-2 flex gap-3 lg:order-1 lg:flex-col">

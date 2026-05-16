@@ -130,7 +130,7 @@ export default function ShopPage() {
       <button
         type="button"
         onClick={() => setFilterOpen(true)}
-        className="eyebrow fixed bottom-8 right-8 z-40 cursor-pointer rounded-full bg-ink px-7 py-4 text-canvas shadow-[0_16px_40px_-12px_rgba(46,42,38,0.5)] transition-colors hover:bg-clay"
+        className="eyebrow fixed bottom-8 left-1/2 z-40 -translate-x-1/2 cursor-pointer rounded-full bg-ink px-7 py-4 text-canvas shadow-[0_16px_40px_-12px_rgba(46,42,38,0.5)] transition-colors hover:bg-clay"
       >
         Filter{activeCount > 0 ? ` · ${activeCount}` : ''}
       </button>

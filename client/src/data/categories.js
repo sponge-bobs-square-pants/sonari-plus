@@ -6,6 +6,8 @@ import pantiesImage from '../assets/categories/category-panties.png'
 /**
  * Homepage categories. `span` carries the Tailwind grid classes for
  * the irregular gallery layout (one tall feature tile + three supporting tiles).
+ * `align` places the caption inside the tile so it lands on the photo's
+ * empty space — defaults to bottom-left in CategoryGallery.
  */
 export const categories = [
   {
@@ -15,6 +17,7 @@ export const categories = [
     count: 24,
     image: nightwearImage,
     span: 'md:col-span-5 md:row-span-2',
+    shadowEdge: 'right',
   },
   {
     id: 'nightdresses',
@@ -23,6 +26,8 @@ export const categories = [
     count: 18,
     image: nightdressesImage,
     span: 'md:col-span-7',
+    align: 'top-right',
+    shadowEdge: 'bottom-left',
   },
   {
     id: 'bras',
@@ -31,6 +36,7 @@ export const categories = [
     count: 31,
     image: brasImage,
     span: 'md:col-span-4',
+    shadowEdge: 'no-bottom',
   },
   {
     id: 'panties',
@@ -39,5 +45,7 @@ export const categories = [
     count: 27,
     image: pantiesImage,
     span: 'md:col-span-3',
+    align: 'bottom-right',
+    shadowEdge: 'top-left',
   },
 ]
