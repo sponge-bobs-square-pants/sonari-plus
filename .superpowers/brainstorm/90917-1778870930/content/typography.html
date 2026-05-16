@@ -1,0 +1,72 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..500&family=Manrope:wght@300..700&family=Outfit:wght@300..600&family=Inter:wght@300..600&family=Cormorant+Garamond:ital,wght@0,300..600;1,400..500&display=swap" rel="stylesheet">
+
+<h2>Which type pairing for the kit?</h2>
+<p class="subtitle">You picked <strong>Soft Minimal</strong> — light, airy, comfort-first. Type is the second pillar of the UI kit. Each card is rendered in its real fonts so you can feel the difference.</p>
+
+<style>
+  .spec { padding:26px 24px; background:#FBFAF7; color:#2E2A26; }
+  .spec .label { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:#9A9081; margin-bottom:10px; }
+  .spec .big { line-height:1.04; margin:0 0 6px; }
+  .spec .lede { font-size:13px; line-height:1.5; color:#6B6459; margin:10px 0 14px; }
+  .spec .meta { display:flex; gap:14px; font-size:10px; color:#9A9081; border-top:1px solid #E4DED4; padding-top:12px; }
+  .spec .price { font-size:15px; color:#2E2A26; }
+</style>
+
+<div class="cards">
+
+  <div class="card" data-choice="all-sans" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;">
+      <div class="spec">
+        <div class="label" style="font-family:'Outfit',sans-serif;">Aa — Geometric Sans</div>
+        <div class="big" style="font-family:'Outfit',sans-serif; font-size:34px; font-weight:500; letter-spacing:-1px;">Sleep soft,<br>wake easy</div>
+        <p class="lede" style="font-family:'Inter',sans-serif;">Everyday nightwear and intimates designed to feel like nothing at all.</p>
+        <div class="meta" style="font-family:'Inter',sans-serif;">
+          <span class="price">Modal Nightdress</span><span>£38</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Outfit + Inter</h3>
+      <p>All sans-serif. Geometric, modern, app-like. Crisp and neutral — the most contemporary, least decorative option.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="serif-sans" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;">
+      <div class="spec">
+        <div class="label" style="font-family:'Manrope',sans-serif;">Aa — Soft Serif + Sans</div>
+        <div class="big" style="font-family:'Fraunces',serif; font-size:36px; font-weight:380; letter-spacing:-0.5px;">Sleep soft,<br><em style="font-weight:380;">wake easy</em></div>
+        <p class="lede" style="font-family:'Manrope',sans-serif;">Everyday nightwear and intimates designed to feel like nothing at all.</p>
+        <div class="meta" style="font-family:'Manrope',sans-serif;">
+          <span class="price">Modal Nightdress</span><span>£38</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Fraunces + Manrope&nbsp;&nbsp;<span style="color:#8C8475;font-weight:400;">(my pick)</span></h3>
+      <p>Soft serif headlines + soft sans body. Keeps the clean comfort feel but adds warmth and intimacy — well suited to lingerie &amp; sleepwear.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="elegant" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;">
+      <div class="spec">
+        <div class="label" style="font-family:'Inter',sans-serif;">Aa — Elegant Serif + Sans</div>
+        <div class="big" style="font-family:'Cormorant Garamond',serif; font-size:42px; font-weight:500; letter-spacing:0;">Sleep soft,<br><em>wake easy</em></div>
+        <p class="lede" style="font-family:'Inter',sans-serif;">Everyday nightwear and intimates designed to feel like nothing at all.</p>
+        <div class="meta" style="font-family:'Inter',sans-serif;">
+          <span class="price">Modal Nightdress</span><span>£38</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · Cormorant + Inter</h3>
+      <p>Delicate high-fashion serif + clean sans. More luxe and editorial — elegant, but leans away from the cosy "Soft Minimal" mood.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:18px;">Click your pick. Also — in the terminal, tell me the <strong>real store name</strong> (right now I'm using the README placeholder "Dad's Clothing Store").</p>

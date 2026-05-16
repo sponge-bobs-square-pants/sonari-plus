@@ -1,0 +1,89 @@
+<h2>What mood should the brand feel like?</h2>
+<p class="subtitle">All three respect your black / white / dull-faded brief — but they interpret it differently. Pick the one that feels most like your dad's store. This becomes the foundation of the whole UI kit.</p>
+
+<style>
+  .dir-card { font-family: -apple-system, system-ui, sans-serif; }
+  .hero-mini { aspect-ratio: 4/3; display:flex; flex-direction:column; justify-content:flex-end; padding:18px; position:relative; overflow:hidden; }
+  .hero-mini .kicker { font-size:8px; letter-spacing:2.5px; text-transform:uppercase; }
+  .hero-mini .display { line-height:1.05; margin:6px 0 4px; }
+  .hero-mini .sub { font-size:8.5px; opacity:.65; }
+  .hero-mini .cta { display:inline-block; margin-top:10px; font-size:8px; letter-spacing:1.5px; text-transform:uppercase; padding:6px 12px; width:fit-content; }
+  .swatches { display:flex; gap:0; }
+  .swatches span { flex:1; height:26px; }
+  .pal-row { display:flex; align-items:center; gap:8px; font-size:9px; padding:8px 0 0; opacity:.7; }
+</style>
+
+<div class="cards">
+
+  <div class="card dir-card" data-choice="editorial" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;">
+      <div class="hero-mini" style="background:#F6F4F0; color:#1A1A1A;">
+        <div style="position:absolute; top:14px; right:16px; width:46%; height:62%; background:linear-gradient(160deg,#DED8CF,#C4BCB0);"></div>
+        <div class="kicker" style="color:#8A8378;">Sleepwear · New In</div>
+        <div class="display" style="font-family:Georgia,serif; font-size:24px; font-weight:400;">Quiet<br>luxury for<br>the night</div>
+        <div class="sub">Considered pieces, made to last</div>
+        <div class="cta" style="border:1px solid #1A1A1A;">Shop the edit</div>
+      </div>
+      <div class="swatches">
+        <span style="background:#F6F4F0;"></span>
+        <span style="background:#E4DED4;"></span>
+        <span style="background:#A89F92;"></span>
+        <span style="background:#5B554D;"></span>
+        <span style="background:#1A1A1A;"></span>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Quiet Editorial</h3>
+      <p>Fashion-magazine restraint. Lots of whitespace, thin serif headlines, oversized photography. Feels expensive and calm — like a high-end catalogue.</p>
+    </div>
+  </div>
+
+  <div class="card dir-card" data-choice="boudoir" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;">
+      <div class="hero-mini" style="background:#16130F; color:#EDE6DC;">
+        <div style="position:absolute; top:14px; right:16px; width:46%; height:62%; background:linear-gradient(160deg,#4A3F3A,#2A2320);"></div>
+        <div class="kicker" style="color:#B89B97;">The Boudoir Collection</div>
+        <div class="display" style="font-family:Georgia,serif; font-size:24px; font-weight:400; font-style:italic;">Softly<br>after dark</div>
+        <div class="sub">Intimate essentials in muted tones</div>
+        <div class="cta" style="background:#B89B97; color:#16130F;">Discover</div>
+      </div>
+      <div class="swatches">
+        <span style="background:#16130F;"></span>
+        <span style="background:#2A2320;"></span>
+        <span style="background:#7A6A63;"></span>
+        <span style="background:#B89B97;"></span>
+        <span style="background:#EDE6DC;"></span>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Dusk Boudoir</h3>
+      <p>Warm, moody, intimate. Soft-black backgrounds with dusty mauve and taupe accents. Sensual and grown-up without being loud — the night-time interpretation.</p>
+    </div>
+  </div>
+
+  <div class="card dir-card" data-choice="comfort" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;">
+      <div class="hero-mini" style="background:#EAE6DF; color:#2E2A26;">
+        <div style="position:absolute; top:14px; right:16px; width:46%; height:62%; background:linear-gradient(160deg,#D6CFC3,#BDB3A4); border-radius:14px;"></div>
+        <div class="kicker" style="color:#9A9081;">Everyday Comfort</div>
+        <div class="display" style="font-family:-apple-system,system-ui,sans-serif; font-size:23px; font-weight:600; letter-spacing:-0.5px;">Made to<br>feel like<br>nothing</div>
+        <div class="sub">Soft, simple, easy to live in</div>
+        <div class="cta" style="background:#2E2A26; color:#EAE6DF; border-radius:20px;">Shop now</div>
+      </div>
+      <div class="swatches">
+        <span style="background:#FBFAF7;"></span>
+        <span style="background:#EAE6DF;"></span>
+        <span style="background:#C9C1B6;"></span>
+        <span style="background:#8C8475;"></span>
+        <span style="background:#2E2A26;"></span>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · Soft Minimal</h3>
+      <p>Light, airy, friendly. Oat and greige tones, clean sans-serif, gentle rounded corners. Approachable and modern — comfort-first rather than editorial.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:18px;">Click the direction you like best. It's fine to say "A's layout but B's colours" — tell me in the terminal and I'll mix them.</p>

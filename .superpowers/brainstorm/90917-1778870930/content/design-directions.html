@@ -1,0 +1,98 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300..600&family=Inter:wght@300..500&display=swap" rel="stylesheet">
+
+<h2>Let's make it distinctive — pick a design direction</h2>
+<p class="subtitle">You're right, that wireframe was a stock template. These are three <em>designed</em> approaches for the Sonari hero — same palette &amp; fonts, very different personalities. The placeholders are intentional soft tones, not photos yet.</p>
+
+<style>
+  .dd-cards .card { margin-bottom:0; }
+  .dd { font-family:'Inter',-apple-system,sans-serif; color:#2E2A26; }
+  .dd-img { background:linear-gradient(150deg,#DAD2C5,#BCB1A0 70%,#A99D8B); }
+  .dd-img.dark { background:linear-gradient(150deg,#3A342E,#221E1A); }
+  .dd-bar { display:flex; justify-content:space-between; align-items:center; font-size:8.5px; letter-spacing:1px; color:#9A9081; }
+  .dd-eyebrow { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:#9A9081; }
+  .dd-cta { font-size:9px; letter-spacing:1.5px; text-transform:uppercase; }
+  .cap { font-size:8px; letter-spacing:.5px; background:#FBFAF7; color:#2E2A26; padding:4px 8px; display:inline-block; }
+</style>
+
+<div class="cards dd-cards" style="grid-template-columns:1fr;">
+
+  <!-- DIRECTION A -->
+  <div class="card" data-choice="editorial-lookbook" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;">
+      <div class="dd" style="background:#FBFAF7;padding:18px 24px 0;">
+        <div class="dd-bar"><strong style="font-size:11px;letter-spacing:3px;color:#2E2A26;">SONARI</strong><span>NIGHTWEAR · BRAS · PANTIES · NEW IN</span><span>♡ &nbsp; BAG (0)</span></div>
+        <div style="display:flex;gap:20px;margin-top:22px;position:relative;">
+          <div style="flex:1.05;padding-bottom:26px;">
+            <div class="dd-eyebrow">The Sleep Edit — 01</div>
+            <div style="font-family:'Outfit',sans-serif;font-weight:500;font-size:46px;line-height:1.0;letter-spacing:-1.5px;margin-top:14px;">Nights<br>made<br>softer.</div>
+            <div style="font-size:10px;color:#6B6459;max-width:230px;margin-top:14px;line-height:1.6;">Modal &amp; cotton sleepwear cut for how you actually sleep — nothing tight, nothing scratchy.</div>
+            <div class="dd-cta" style="margin-top:18px;border-bottom:1.5px solid #2E2A26;display:inline-block;padding-bottom:4px;">Explore the collection →</div>
+          </div>
+          <div style="flex:.95;position:relative;">
+            <div class="dd-img" style="height:200px;margin-top:-8px;"></div>
+            <div style="position:absolute;bottom:12px;left:-14px;"><span class="cap">Modal Slip — £38</span></div>
+          </div>
+          <div style="position:absolute;right:0;bottom:0;font-family:'Outfit',sans-serif;font-size:13px;color:#C2B9AA;">↓ scroll</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Editorial Lookbook</h3>
+      <p><strong>Asymmetric &amp; magazine-like.</strong> Oversized type breaks the grid, the image sits offset, sections are numbered like an editorial. Feels like a fashion story, not a shop. Best if you want Sonari to feel designed and premium. Most ambitious to build.</p>
+    </div>
+  </div>
+
+  <!-- DIRECTION B -->
+  <div class="card" data-choice="quiet-gallery" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;">
+      <div class="dd" style="background:#16130F;">
+        <div class="dd-img dark" style="height:212px;position:relative;display:flex;flex-direction:column;justify-content:space-between;padding:16px 22px;">
+          <div style="text-align:center;color:#EDE6DC;font-size:11px;letter-spacing:5px;">SONARI</div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+            <div>
+              <div style="color:#B7AC9A;font-size:8.5px;letter-spacing:2px;text-transform:uppercase;">Autumn / Winter</div>
+              <div style="font-family:'Outfit',sans-serif;color:#EDE6DC;font-size:24px;font-weight:300;letter-spacing:-0.5px;margin-top:4px;">Quiet hours, beautifully dressed</div>
+            </div>
+            <div style="color:#B7AC9A;font-size:8px;letter-spacing:1.5px;">( 01 / 04 )</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;padding:6px;background:#16130F;">
+          <div class="dd-img" style="flex:2;height:56px;"></div>
+          <div class="dd-img" style="flex:1;height:56px;"></div>
+          <div class="dd-img" style="flex:1.4;height:56px;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Quiet Gallery</h3>
+      <p><strong>Image-led &amp; immersive.</strong> A near full-bleed hero with barely-there UI — the photography carries everything, type stays small and refined. Below, an irregular gallery grid. Calm, confident, high-end. Depends most on great photos later.</p>
+    </div>
+  </div>
+
+  <!-- DIRECTION C -->
+  <div class="card" data-choice="split-boutique" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;">
+      <div class="dd" style="display:flex;min-height:212px;">
+        <div style="flex:1;background:#EAE6DF;padding:22px 24px;display:flex;flex-direction:column;justify-content:center;">
+          <div class="dd-bar" style="position:absolute;top:14px;left:24px;"><strong style="font-size:10px;letter-spacing:3px;color:#2E2A26;">SONARI</strong></div>
+          <div class="dd-eyebrow">New In — Sleepwear</div>
+          <div style="font-family:'Outfit',sans-serif;font-weight:500;font-size:30px;line-height:1.08;letter-spacing:-1px;margin-top:10px;">Softness,<br>by design.</div>
+          <div style="font-size:10px;color:#6B6459;margin-top:10px;line-height:1.6;max-width:220px;">Nightdresses, bras and everyday intimates in fabrics that disappear on the skin.</div>
+          <div style="margin-top:16px;"><span style="background:#2E2A26;color:#FBFAF7;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;padding:9px 18px;border-radius:2px;">Shop new in</span></div>
+        </div>
+        <div class="dd-img" style="flex:1;position:relative;">
+          <div style="position:absolute;bottom:12px;right:12px;"><span class="cap">Cotton Set — £52</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · Split Boutique</h3>
+      <p><strong>Structured &amp; balanced.</strong> A crisp 50/50 split — type and CTA on one side, full-height image on the other, alternating as you scroll. Still designed and elegant, but the most orderly and the quickest, safest to build well.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:18px;">Click the direction that feels like Sonari. Want a hybrid (e.g. A's big type with C's structure)? Tell me in the terminal.</p>

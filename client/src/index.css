@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+/* ───────────────────────────────────────────────
+   Sonari Nightwear — design tokens
+   Defined once here; every component reads from
+   these. Tailwind v4 turns each --color-* into
+   bg-*, text-*, border-* utilities automatically.
+─────────────────────────────────────────────── */
+@theme {
+  /* Warm tonal scale — the black / white / dull-faded brief */
+  --color-canvas: #fbfaf7; /* page background, warm near-white   */
+  --color-oat: #eae6df; /* alternating sections, panels        */
+  --color-linen: #e4ded4; /* borders, dividers                   */
+  --color-greige: #c9c1b6; /* faint UI, disabled states           */
+  --color-clay: #8c8475; /* secondary / muted text              */
+  --color-ink: #2e2a26; /* primary text, buttons (warm black)  */
+  --color-dusk: #b89b97; /* the one restrained dusty-mauve accent */
+
+  /* Type — Outfit for display, Inter for body/UI */
+  --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* A single calm easing curve, reused everywhere */
+  --ease-calm: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* Fixed header height (announcement bar + nav). Full-screen
+     landing sections subtract this so they fit the VISIBLE area. */
+  --header-height: 105px;
+}
+
+/* ── Base layer ──────────────────────────────── */
+@layer base {
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-weight: 300;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: var(--color-dusk);
+    color: var(--color-canvas);
+  }
+
+  /* Calm, slow scrolling between anchored sections */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Neutralise the browser's blue/yellow autofill background.
+     There's no direct way to override an autofilled field's
+     background — the trick is a giant inset box-shadow in the
+     canvas colour, plus a 9999s transition so the flash never shows. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--color-ink);
+    -webkit-box-shadow: 0 0 0 1000px var(--color-canvas) inset;
+    caret-color: var(--color-ink);
+    transition: background-color 9999s ease-in-out 0s;
+  }
+}
+
+/* ── Utilities ───────────────────────────────── */
+@layer utilities {
+  /* Fine film grain — layered over tonal placeholders so
+     they read as intentional texture, not flat blocks. */
+  .grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+
+  /* Eyebrow / kicker text — small, uppercase, tracked-out */
+  .eyebrow {
+    font-size: 0.6875rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+}
+
+/* ── Entrance motion ─────────────────────────── */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Applied on first paint (hero) and on scroll-reveal (sections).
+   `both` keeps the element hidden until its delay elapses. */
+.animate-fade-up {
+  animation: fade-up 0.95s var(--ease-calm) both;
+}
+.animate-fade-in {
+  animation: fade-in 1.3s var(--ease-calm) both;
+}
+/* Faster fade for the full-screen menu takeover */
+.animate-menu-in {
+  animation: fade-in 0.4s var(--ease-calm) both;
+}
+
+/* Block "build" reveals — each element is drawn in by un-clipping it,
+   so the menu assembles itself piece by piece. clip-path leaves the
+   `opacity` property free, so elements keep their resting opacity. */
+@keyframes build-x {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes build-y {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.build-x {
+  animation: build-x 0.55s var(--ease-calm) both;
+}
+.build-y {
+  animation: build-y 0.8s var(--ease-calm) both;
+}
+
+/* Reveal-on-scroll: hidden until the .is-visible class is added
+   by the IntersectionObserver in useReveal(). */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition:
+    opacity 0.9s var(--ease-calm),
+    transform 0.9s var(--ease-calm);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-menu-in,
+  .build-x,
+  .build-y {
+    animation: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
