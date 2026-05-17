@@ -18,6 +18,8 @@ import SignupPage from './pages/SignupPage'
 import AccountPage from './pages/AccountPage'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminProductsPage from './pages/admin/AdminProductsPage'
+import AdminOrdersPage from './pages/admin/AdminOrdersPage'
+import AdminBillsPage from './pages/admin/AdminBillsPage'
 import AdminProductForm from './pages/admin/AdminProductForm'
 import AdminLandingConfig from './pages/admin/AdminLandingConfig'
 import RequireAuth from './components/auth/RequireAuth'
@@ -76,6 +78,8 @@ function App() {
         {/* Admin — one guard wraps the whole section via <Outlet /> */}
         <Route element={<RequireAdmin><Outlet /></RequireAdmin>}>
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/orders" element={<AdminOrdersPage />} />
+          <Route path="/admin/bills" element={<AdminBillsPage />} />
           <Route path="/admin/products" element={<AdminProductsPage />} />
           <Route path="/admin/products/new" element={<AdminProductForm />} />
           <Route path="/admin/products/:id/edit" element={<AdminProductForm />} />

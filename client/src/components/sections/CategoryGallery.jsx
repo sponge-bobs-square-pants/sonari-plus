@@ -41,7 +41,8 @@ export default function CategoryGallery() {
   return (
     <section
       id="categories"
-      className="mx-auto flex min-h-[calc(100vh-var(--header-height))] max-w-7xl flex-col justify-center px-6 py-16"
+      data-nav-surface="canvas"
+      className="mx-auto flex min-h-screen max-w-7xl snap-start snap-always flex-col justify-center px-6 pb-16 pt-[var(--header-height)]"
     >
       <Reveal className="mb-8 flex items-end justify-between">
         <div>

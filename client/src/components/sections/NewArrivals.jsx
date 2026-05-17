@@ -38,7 +38,11 @@ export default function NewArrivals() {
   const hasProducts = products.length > 0
 
   return (
-    <section id="new" className="flex min-h-[calc(100vh-var(--header-height))] items-center bg-oat">
+    <section
+      id="new"
+      data-nav-surface="oat"
+      className="flex min-h-screen snap-start snap-always items-center bg-oat pt-[var(--header-height)]"
+    >
       <div className="mx-auto w-full max-w-7xl px-6 py-20">
         <Reveal className="mb-12 flex items-end justify-between">
           <div>

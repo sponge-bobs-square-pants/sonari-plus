@@ -35,8 +35,16 @@ When an admin approves a return, call Razorpay's refunds API and handle the
 `refund.processed` webhook to reflect it on the order.
 
 ### Order emails [P2]
-No transactional email anywhere. Add order-confirmation and shipping-update
-emails (an email provider + templates).
+No transactional email anywhere. **The plan:** on the Razorpay **webhook**
+confirmation, send the customer an order-received acknowledgment. Two rules
+when building it:
+- Send it **inside the `paymentStatus !== 'paid'` idempotency guard** in
+  `razorpayWebhook` — so it fires exactly once per order, never on retries.
+- Make the send **best-effort** — wrap it so a mail failure can NEVER fail
+  the webhook response, or Razorpay will retry the whole webhook.
+Shipping-update emails (dispatched, etc.) come later, same provider.
+**Blocked:** needs an email provider + a sending domain — set up once the
+store domain is purchased.
 
 ### Order detail / history [P2]
 `/order/confirmed` reads the order from router state — a refresh loses it. Add
@@ -93,6 +101,13 @@ The homepage Newsletter section has no API. Build the subscribe route.
 ### Image optimization [P2]
 Category images are large (~900 KB each). Serve responsive/transformed sizes
 (Cloudinary transformations) and proper formats.
+
+### Cheaper asset storage [P3]
+Cloudinary hosts everything — product images, and (once built) invoice PDFs.
+At scale a cheaper object store (AWS S3, Cloudflare R2, Backblaze B2) would
+cut cost. A migration touches the upload path (`POST /api/upload`), every
+stored asset URL, and invoice hosting. Not urgent — revisit when storage
+cost actually bites.
 
 ### Cursor pagination for `/shop` [P3]
 `/shop` uses skip/limit pagination — fine for normal browsing. If very deep

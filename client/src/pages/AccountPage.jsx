@@ -47,9 +47,11 @@ function formatOrderDate(iso) {
 // Order.status is lowercase in the DB — title-case it for display.
 const STATUS_LABEL = {
   placed: 'Placed',
-  shipped: 'Shipped',
+  accepted: 'Accepted',
+  dispatched: 'Dispatched',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
+  'failed-delivery': 'Failed delivery',
 }
 
 /* One product image inside an order — shown at its natural aspect ratio
@@ -179,9 +181,22 @@ function OrderDetailPanel({ order, cols, sideBySide, onClose }) {
 
       {/* Actions — Invoice + Track (Track's logic lands later) */}
       <div className="mt-7 flex gap-3">
-        <Button variant="outline" className="flex-1">
-          Invoice
-        </Button>
+        {order.billOfSupply?.url ? (
+          <Button
+            as="a"
+            href={order.billOfSupply.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="outline"
+            className="flex-1"
+          >
+            Invoice
+          </Button>
+        ) : (
+          <Button variant="outline" className="flex-1" disabled>
+            Invoice
+          </Button>
+        )}
         <Button variant="solid" className="flex-1">
           Track
         </Button>

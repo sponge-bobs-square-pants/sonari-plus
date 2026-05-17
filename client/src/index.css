@@ -49,6 +49,18 @@
     scroll-behavior: smooth;
   }
 
+  /* Landing page — every section snaps; scrolling always lands on the next
+     screen, never free-scrolls. Desktop only (mobile keeps natural touch
+     scrolling). The `snap-screens` class is toggled on <html> by LandingPage.
+     Sections are full-bleed and snap to the viewport top (no scroll-padding)
+     — each pads its OWN content down past the fixed navbar, so the navbar
+     never overlays a neighbouring section (no seam can show). */
+  @media (min-width: 1024px) {
+    html.snap-screens {
+      scroll-snap-type: y mandatory;
+    }
+  }
+
   /* Neutralise the browser's blue/yellow autofill background.
      There's no direct way to override an autofilled field's
      background — the trick is a giant inset box-shadow in the
@@ -77,6 +89,15 @@
     font-size: 0.6875rem;
     letter-spacing: 0.22em;
     text-transform: uppercase;
+  }
+
+  /* Keep an element scrollable but hide its scrollbar. */
+  .scrollbar-hide {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* legacy Edge */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome / Safari / Brave */
   }
 }
 

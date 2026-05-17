@@ -19,11 +19,14 @@ export default function Newsletter() {
   }
 
   return (
-    <section className="bg-oat">
-      <div className="mx-auto max-w-xl px-6 py-24 text-center md:py-32">
+    // The top padding clears the fixed navbar — and because it lives on
+    // this oat block (not the colourless closing <section>), the oat
+    // background runs right up behind the navbar, leaving no seam.
+    <div className="bg-oat pt-[var(--header-height)]">
+      <div className="mx-auto max-w-xl px-6 py-9 text-center">
         <Reveal>
           <p className="eyebrow text-clay">Stay close</p>
-          <h2 className="mt-4 font-display text-3xl font-light tracking-tight text-ink md:text-[2.5rem]">
+          <h2 className="mt-4 font-display text-3xl font-light tracking-tight text-ink">
             First look, slow mornings
           </h2>
           <p className="mt-4 text-sm leading-relaxed text-clay">
@@ -36,7 +39,7 @@ export default function Newsletter() {
               Thank you — welcome to Sonari. ♡
             </p>
           ) : (
-            <form onSubmit={handleSubmit} className="mt-10">
+            <form onSubmit={handleSubmit} className="mt-7">
               <div className="flex items-end gap-4 border-b border-ink/30 pb-2 transition-colors focus-within:border-ink">
                 <input
                   type="email"
@@ -65,6 +68,6 @@ export default function Newsletter() {
           )}
         </Reveal>
       </div>
-    </section>
+    </div>
   )
 }

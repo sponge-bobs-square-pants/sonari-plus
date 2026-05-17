@@ -35,8 +35,8 @@ const LEGAL = [
 export default function Footer() {
   return (
     <footer className="bg-ink text-canvas">
-      <div className="mx-auto max-w-7xl px-6 py-20">
-        <div className="grid gap-14 md:grid-cols-[1.4fr_2fr]">
+      <div className="mx-auto max-w-7xl px-6 py-6">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_2fr]">
           {/* Brand */}
           <div>
             <p className="font-display text-3xl font-light tracking-[0.3em] pl-[0.3em]">
@@ -53,7 +53,7 @@ export default function Footer() {
             {COLUMNS.map((col) => (
               <div key={col.title}>
                 <h4 className="eyebrow text-[0.625rem] text-dusk">{col.title}</h4>
-                <ul className="mt-5 space-y-3">
+                <ul className="mt-4 space-y-2.5">
                   {col.items.map((item) => {
                     const label = typeof item === 'string' ? item : item.label
                     const to = typeof item === 'string' ? null : item.to
@@ -80,7 +80,7 @@ export default function Footer() {
         </div>
 
         {/* Lower bar */}
-        <div className="mt-16 flex flex-col gap-5 border-t border-canvas/12 pt-8 text-xs text-canvas/45 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-6 flex flex-col gap-5 border-t border-canvas/12 pt-6 text-xs text-canvas/45 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
             <p>
               © {new Date().getFullYear()} Sonari Nightwear. All rights

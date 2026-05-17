@@ -9,12 +9,15 @@ import AnnouncementBar from './AnnouncementBar'
 import MenuOverlay from './MenuOverlay'
 
 /**
- * The solid (scrolled / forced) background, matched to the page's
- * surface — storefront pages are `canvas`, the product page is white.
+ * The solid (scrolled / forced) background, matched to the section behind
+ * it. Fully OPAQUE on purpose — a translucent bar picks up whatever sits
+ * under it (e.g. the dark Hero image the landing navbar overlays), which
+ * leaves a visible seam against the section it should be matching.
  */
 const SOLID_BG = {
-  canvas: 'bg-canvas/95',
-  white: 'bg-white/95',
+  canvas: 'bg-canvas',
+  oat: 'bg-oat',
+  white: 'bg-white',
 }
 
 /**
@@ -48,7 +51,7 @@ export default function Header({
             isSolid
               ? `${border ? 'border-b border-linen ' : ''}${
                   SOLID_BG[surface] ?? SOLID_BG.canvas
-                } backdrop-blur-md`
+                }`
               : 'bg-transparent'
           }`}
         >

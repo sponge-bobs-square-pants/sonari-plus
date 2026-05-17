@@ -9,7 +9,10 @@ import Button from '../ui/Button'
  */
 export default function Hero() {
   return (
-    <section id="top" className="relative min-h-screen overflow-hidden">
+    <section
+      id="top"
+      className="relative min-h-screen snap-start snap-always overflow-hidden"
+    >
       {/* Full-bleed image stand-in */}
       <Placeholder
         tone="deep"

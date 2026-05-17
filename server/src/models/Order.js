@@ -30,6 +30,35 @@ const shippingAddressSchema = new mongoose.Schema(
   { _id: false },
 )
 
+/**
+ * The admin's Razorpay re-confirmation of an order's payment (the "verify
+ * check"). Null until first checked. `status` is Razorpay's real verdict —
+ * compared against `paymentStatus` to surface any discrepancy.
+ */
+const verificationSchema = new mongoose.Schema(
+  {
+    // 'paid' only when Razorpay shows a CAPTURED payment whose amount
+    // equals the order total; otherwise 'failed' / 'pending'.
+    status: { type: String, enum: ['paid', 'failed', 'pending'] },
+    checkedAt: { type: Date },
+  },
+  { _id: false },
+)
+
+/**
+ * The Bill of Supply generated for a paid order — null until the admin
+ * generates it. `number` is the consecutive per-financial-year serial,
+ * `url` the hosted PDF.
+ */
+const billOfSupplySchema = new mongoose.Schema(
+  {
+    number: { type: String }, // e.g. 'BS/2025-26/0001'
+    url: { type: String }, // hosted PDF (Cloudinary)
+    issuedAt: { type: Date },
+  },
+  { _id: false },
+)
+
 const orderSchema = new mongoose.Schema(
   {
     user: {
@@ -54,17 +83,45 @@ const orderSchema = new mongoose.Schema(
       default: 'created',
     },
 
-    // Fulfilment status (advanced from the admin panel later).
+    // Fulfilment status, advanced from the admin panel:
+    //   placed → accepted (Bill of Supply generated)
+    //          → dispatched (courier + tracking entered) → delivered.
+    // Plus cancelled / failed-delivery.
     status: {
       type: String,
-      enum: ['placed', 'shipped', 'delivered', 'cancelled'],
+      enum: [
+        'placed',
+        'accepted',
+        'dispatched',
+        'delivered',
+        'cancelled',
+        'failed-delivery',
+      ],
       default: 'placed',
     },
 
-    // Last day a return may be requested. Fixed when the order is created
-    // (createdAt + the return window from the Refund & Cancellation policy),
-    // so the deadline never shifts afterwards.
+    // Last day a return may be requested — stamped when the order is marked
+    // DELIVERED (delivery date + the Refund & Cancellation policy's return
+    // window), since the window starts on receipt. Null until delivered.
     returnDeadline: { type: Date },
+
+    // Has an admin opened this order yet? Drives the "New" badge — set
+    // true the first time the admin views the order.
+    seenByAdmin: { type: Boolean, default: false },
+
+    // Result of the admin's Razorpay verify check (null until run).
+    verification: { type: verificationSchema, default: null },
+
+    // The Bill of Supply — null until the admin generates it.
+    billOfSupply: { type: billOfSupplySchema, default: null },
+
+    // Courier dispatch — set when the admin marks the order dispatched.
+    courier: {
+      type: String,
+      enum: ['', 'delhivery', 'bluedart', 'indiapost'],
+      default: '',
+    },
+    trackingId: { type: String, default: '' },
   },
   { timestamps: true },
 )

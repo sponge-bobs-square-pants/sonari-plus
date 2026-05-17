@@ -9,11 +9,22 @@ import { logout } from '../../features/auth/authSlice'
  *
  * `dark` flips the whole page to the ink theme and drops the header
  * border — used only by the dashboard.
+ *
+ * `wide` widens the content container (`max-w-7xl`) — for grid-heavy pages
+ * like the product catalogue. `full` drops the width cap AND, on desktop,
+ * pins the page to the viewport height with the content area as a fill
+ * flex-column — for full-bleed master/detail tools like the orders page.
+ *
+ * `fit` pins the page to the viewport height and scrolls the CONTENT AREA
+ * internally rather than the window — the page itself never scrolls.
  */
 export default function AdminPageShell({
   backTo,
   backLabel = 'Back',
   dark = false,
+  wide = false,
+  full = false,
+  fit = false,
   children,
 }) {
   const dispatch = useDispatch()
@@ -25,9 +36,17 @@ export default function AdminPageShell({
   }
 
   return (
-    <div className={`min-h-screen ${dark ? 'bg-ink text-canvas' : 'bg-canvas'}`}>
+    <div
+      className={`${
+        fit
+          ? 'flex h-screen flex-col overflow-hidden'
+          : full
+            ? 'min-h-screen lg:flex lg:h-screen lg:flex-col lg:overflow-hidden'
+            : 'min-h-screen'
+      } ${dark ? 'bg-ink text-canvas' : 'bg-canvas'}`}
+    >
       <header
-        className={`flex items-center justify-between px-6 py-6 sm:px-10 ${
+        className={`flex shrink-0 items-center justify-between px-6 py-6 sm:px-10 ${
           dark ? '' : 'border-b border-linen'
         }`}
       >
@@ -67,7 +86,17 @@ export default function AdminPageShell({
         </div>
       </header>
 
-      <div className="mx-auto max-w-4xl px-6 py-14 sm:px-10">{children}</div>
+      <div
+        className={`mx-auto w-full px-6 sm:px-10 ${
+          fit ? 'min-h-0 flex-1 overflow-y-auto scrollbar-hide' : ''
+        } ${
+          full
+            ? 'max-w-none pt-9 pb-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col'
+            : `py-14 ${wide ? 'max-w-7xl' : 'max-w-4xl'}`
+        }`}
+      >
+        {children}
+      </div>
     </div>
   )
 }

@@ -8,8 +8,8 @@ const ITEMS = [
   },
   {
     icon: 'returns',
-    title: '30-day easy returns',
-    text: 'Change your mind within 30 days — returns are always free across India.',
+    title: 'Easy 10-day returns',
+    text: 'Changed your mind? Return it within 10 days of delivery.',
   },
   {
     icon: 'secure',
@@ -55,11 +55,12 @@ function PropIcon({ name }) {
   )
 }
 
-/** Quiet trust row — thin band separating the story from the newsletter. */
+/** Quiet trust band — grows to fill the closing screen between the
+    newsletter and the footer, with the value props centered inside. */
 export default function ValueProps() {
   return (
-    <section className="border-y border-linen">
-      <div className="mx-auto grid max-w-7xl gap-12 px-6 py-16 md:grid-cols-3 md:gap-10">
+    <div className="flex flex-1 items-center border-y border-linen">
+      <div className="mx-auto grid w-full max-w-7xl gap-12 px-6 py-8 md:grid-cols-3 md:gap-10">
         {ITEMS.map((item, i) => (
           <Reveal
             key={item.icon}
@@ -78,6 +79,6 @@ export default function ValueProps() {
           </Reveal>
         ))}
       </div>
-    </section>
+    </div>
   )
 }

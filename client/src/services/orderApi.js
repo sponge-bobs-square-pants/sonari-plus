@@ -17,3 +17,58 @@ export const verifyPayment = (payload) =>
 
 /** The signed-in user's paid orders, newest first. */
 export const listOrders = () => api.get('/orders').then((d) => d.orders)
+
+/**
+ * Admin: every order in the store, newest-first, paginated. Returns the
+ * whole envelope — callers need `total` / `hasMore` for "Load more".
+ * @param {object} params - { page, limit, paymentStatus, status, unseen,
+ *   dateFrom, dateTo, search } — all optional filters.
+ * @returns {Promise<{ orders, page, totalPages, total, hasMore }>}
+ */
+export const listAllOrders = (params = {}) => {
+  const { page, limit, paymentStatus, status, unseen, dateFrom, dateTo, search } =
+    params
+  const qs = new URLSearchParams()
+  if (page) qs.set('page', page)
+  if (limit) qs.set('limit', limit)
+  if (paymentStatus) qs.set('paymentStatus', paymentStatus)
+  if (status) qs.set('status', status)
+  if (unseen) qs.set('unseen', 'true')
+  if (dateFrom) qs.set('dateFrom', dateFrom)
+  if (dateTo) qs.set('dateTo', dateTo)
+  if (search) qs.set('search', search)
+  const q = qs.toString()
+  return api.get(q ? `/orders/admin?${q}` : '/orders/admin')
+}
+
+/** Admin: mark an order as opened/seen. Resolves to the updated order. */
+export const markOrderSeen = (id) =>
+  api.post(`/orders/admin/${id}/seen`).then((d) => d.order)
+
+/** Admin: run the Razorpay verify check on an order. Resolves to the order. */
+export const verifyOrder = (id) =>
+  api.post(`/orders/admin/${id}/verify`).then((d) => d.order)
+
+/**
+ * Admin: generate the Bill of Supply for a paid order — assigns a serial,
+ * renders + hosts the PDF, and advances the order to `accepted`.
+ * Resolves to the updated order.
+ */
+export const generateBill = (id) =>
+  api.post(`/orders/admin/${id}/bill`).then((d) => d.order)
+
+/**
+ * Admin: the Bill-of-Supply register — orders with a bill, within an
+ * optional issued-date range.
+ * @param {object} params - { page, limit, from, to } (dates: YYYY-MM-DD)
+ * @returns {Promise<{ bills, count, turnover, page, hasMore }>}
+ */
+export const listBills = ({ page, limit, from, to } = {}) => {
+  const qs = new URLSearchParams()
+  if (page) qs.set('page', page)
+  if (limit) qs.set('limit', limit)
+  if (from) qs.set('from', from)
+  if (to) qs.set('to', to)
+  const q = qs.toString()
+  return api.get(q ? `/orders/admin/bills?${q}` : '/orders/admin/bills')
+}

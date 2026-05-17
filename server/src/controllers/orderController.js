@@ -2,22 +2,20 @@ import crypto from 'crypto'
 import Order from '../models/Order.js'
 import Cart from '../models/Cart.js'
 import Product from '../models/Product.js'
+import Counter from '../models/Counter.js'
+import cloudinary from '../config/cloudinary.js'
 import {
   razorpay,
   RAZORPAY_KEY_ID,
   RAZORPAY_KEY_SECRET,
   RAZORPAY_WEBHOOK_SECRET,
 } from '../config/razorpay.js'
+import { financialYear, buildBillOfSupplyPdf } from '../utils/billOfSupply.js'
 
 // Must mirror client/src/data/shipping.js — the server is the source of
 // truth for money, so the client's totals are never trusted.
 const FREE_DELIVERY_THRESHOLD = 2000
 const DELIVERY_FEE = 120
-
-// Days a customer has to request a return — from the Refund & Cancellation
-// policy. The deadline is frozen onto each order the moment it's created.
-const RETURN_WINDOW_DAYS = 10
-const DAY_MS = 24 * 60 * 60 * 1000
 
 const REQUIRED_ADDRESS_FIELDS = [
   'fullName',
@@ -126,6 +124,8 @@ export async function createOrder(req, res, next) {
     const total = subtotal + deliveryFee
 
     // Our order first — its id becomes the Razorpay receipt reference.
+    // (`returnDeadline` is NOT set here — the return window starts on
+    // delivery, so it's stamped when the order is marked delivered.)
     const order = await Order.create({
       user: req.user._id,
       items,
@@ -133,7 +133,6 @@ export async function createOrder(req, res, next) {
       subtotal,
       deliveryFee,
       total,
-      returnDeadline: new Date(Date.now() + RETURN_WINDOW_DAYS * DAY_MS),
     })
 
     const rzpOrder = await razorpay.orders.create({
@@ -229,6 +228,258 @@ export async function listMyOrders(req, res, next) {
       paymentStatus: 'paid',
     }).sort({ createdAt: -1 })
     res.json({ orders })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * GET /api/orders/admin — every order in the store, newest first, for the
+ * admin panel. Paginated; each order's customer name/email is joined in.
+ * Unlike the customer list this returns ALL paymentStatuses (paid, pending
+ * and failed) — the admin needs the full picture.
+ *
+ * Optional filters: `paymentStatus`, `status` (fulfilment), `unseen=true`
+ * (orders the admin hasn't opened), and a `dateFrom`/`dateTo` window.
+ */
+export async function listAllOrders(req, res, next) {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const limit = Math.min(60, Math.max(1, parseInt(req.query.limit, 10) || 30))
+    const skip = (page - 1) * limit
+
+    const filter = {}
+    if (req.query.paymentStatus) filter.paymentStatus = req.query.paymentStatus
+    if (req.query.status) filter.status = req.query.status
+    if (req.query.unseen === 'true') filter.seenByAdmin = false
+    if (req.query.dateFrom || req.query.dateTo) {
+      filter.createdAt = {}
+      if (req.query.dateFrom) {
+        filter.createdAt.$gte = new Date(req.query.dateFrom)
+      }
+      if (req.query.dateTo) {
+        const to = new Date(req.query.dateTo)
+        to.setHours(23, 59, 59, 999) // include the whole end day
+        filter.createdAt.$lte = to
+      }
+    }
+    if (req.query.search) {
+      // Customers quote the short code shown in the UI — the last 8 hex
+      // chars of the _id. Strip anything non-hex (a leading '#', spaces)
+      // and match it as a substring of the stringified _id, case-insensitive.
+      const term = req.query.search.replace(/[^a-fA-F0-9]/g, '')
+      if (term) {
+        filter.$expr = {
+          $regexMatch: {
+            input: { $toString: '$_id' },
+            regex: term,
+            options: 'i',
+          },
+        }
+      }
+    }
+
+    const [orders, total] = await Promise.all([
+      Order.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('user', 'name email'),
+      Order.countDocuments(filter),
+    ])
+
+    res.json({
+      orders,
+      page,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      total,
+      hasMore: skip + orders.length < total,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * The admin verify check — re-confirm an order's payment straight from
+ * Razorpay (not from our own records). Returns 'paid' | 'failed' |
+ * 'pending'. 'paid' requires a CAPTURED payment whose amount equals the
+ * order total in paise — the owner's rule, so a wrong-amount capture does
+ * NOT count as paid.
+ */
+async function verifyWithRazorpay(order) {
+  if (!order.razorpayOrderId) return 'pending'
+
+  const { items = [] } = await razorpay.orders.fetchPayments(
+    order.razorpayOrderId,
+  )
+  const expectedPaise = Math.round(order.total * 100)
+
+  const cleanCapture = items.some(
+    (p) => p.status === 'captured' && p.amount === expectedPaise,
+  )
+  if (cleanCapture) return 'paid'
+
+  const anyCapture = items.some((p) => p.status === 'captured')
+  if (!anyCapture && items.some((p) => p.status === 'failed')) return 'failed'
+  return 'pending'
+}
+
+/** POST /api/orders/admin/:id/seen — mark an order opened by the admin. */
+export async function markOrderSeen(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id).populate(
+      'user',
+      'name email',
+    )
+    if (!order) return res.status(404).json({ message: 'Order not found.' })
+    if (!order.seenByAdmin) {
+      order.seenByAdmin = true
+      await order.save()
+    }
+    res.json({ order })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * POST /api/orders/admin/:id/verify — run (or re-run) the Razorpay verify
+ * check and store the result on the order. Backs both the automatic check
+ * on first open and the manual "Re-check" button.
+ */
+export async function verifyOrderPayment(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id).populate(
+      'user',
+      'name email',
+    )
+    if (!order) return res.status(404).json({ message: 'Order not found.' })
+
+    order.verification = {
+      status: await verifyWithRazorpay(order),
+      checkedAt: new Date(),
+    }
+    await order.save()
+    res.json({ order })
+  } catch (err) {
+    console.error('[verify] admin re-check failed:', err.message)
+    next(err)
+  }
+}
+
+/**
+ * POST /api/orders/admin/:id/bill — generate the Bill of Supply for a paid
+ * order: assign a consecutive serial, render the PDF, host it on Cloudinary,
+ * store it on the order, and advance the order from `placed` to `accepted`.
+ *
+ * Note: the serial is drawn before the (rare) render/upload can fail, so a
+ * failure can leave a one-number gap — acceptable, and far safer than the
+ * alternative (a counter that decrements is not race-safe).
+ */
+export async function generateBillOfSupply(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id).populate(
+      'user',
+      'name email',
+    )
+    if (!order) return res.status(404).json({ message: 'Order not found.' })
+
+    // A Bill of Supply is never re-issued — return the existing one.
+    if (order.billOfSupply?.url) return res.json({ order })
+
+    // Only a genuinely PAID order may be billed (and thereby accepted).
+    if (order.paymentStatus !== 'paid') {
+      return res.status(400).json({
+        message: 'A Bill of Supply can only be generated for a paid order.',
+      })
+    }
+
+    // Consecutive serial, unique per financial year.
+    const fy = financialYear(new Date())
+    const seq = await Counter.next(`bos-${fy}`)
+    const number = `BS/${fy}/${String(seq).padStart(4, '0')}`
+
+    // Render → host on Cloudinary as a raw asset.
+    const pdf = await buildBillOfSupplyPdf(order, number)
+    const url = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'sonari/bills',
+          resource_type: 'raw',
+          public_id: number.replace(/\//g, '-'),
+        },
+        (err, result) => (err ? reject(err) : resolve(result.secure_url)),
+      )
+      stream.end(pdf)
+    })
+
+    order.billOfSupply = { number, url, issuedAt: new Date() }
+    if (order.status === 'placed') order.status = 'accepted'
+    await order.save()
+
+    res.json({ order })
+  } catch (err) {
+    console.error('[bill] generation failed:', err.message)
+    next(err)
+  }
+}
+
+/**
+ * GET /api/orders/admin/bills — the Bill-of-Supply register: every order
+ * that has a bill, within an optional issued-date range. Returns a
+ * paginated list PLUS the count and turnover aggregated over the WHOLE
+ * match — the figures the admin needs for the composition GST return.
+ */
+export async function listBills(req, res, next) {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(req.query.limit, 10) || 40),
+    )
+    const skip = (page - 1) * limit
+
+    const filter = { billOfSupply: { $ne: null } }
+    if (req.query.from || req.query.to) {
+      filter['billOfSupply.issuedAt'] = {}
+      if (req.query.from) {
+        filter['billOfSupply.issuedAt'].$gte = new Date(req.query.from)
+      }
+      if (req.query.to) {
+        const to = new Date(req.query.to)
+        to.setHours(23, 59, 59, 999) // include the whole end day
+        filter['billOfSupply.issuedAt'].$lte = to
+      }
+    }
+
+    const [bills, agg] = await Promise.all([
+      Order.find(filter)
+        .select('billOfSupply total shippingAddress user')
+        .sort({ 'billOfSupply.issuedAt': -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('user', 'name email'),
+      Order.aggregate([
+        { $match: filter },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            turnover: { $sum: '$total' },
+          },
+        },
+      ]),
+    ])
+
+    const { count = 0, turnover = 0 } = agg[0] || {}
+    res.json({
+      bills,
+      page,
+      count,
+      turnover,
+      hasMore: skip + bills.length < count,
+    })
   } catch (err) {
     next(err)
   }

@@ -50,6 +50,14 @@ const PATHS = {
     </>
   ),
   filter: <path d="M4 6h16l-6 7v6l-4-2v-4L4 6Z" />,
+  doc: (
+    <>
+      <rect x="5" y="3.5" width="14" height="17" rx="1" />
+      <path d="M8.5 9h7" />
+      <path d="M8.5 12.5h7" />
+      <path d="M8.5 16h4" />
+    </>
+  ),
 }
 
 export default function Icon({ name, className = 'h-[26px] w-[26px]' }) {
