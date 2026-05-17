@@ -10,7 +10,13 @@ const PRIMARY = [
   ...categories.map((c) => ({ name: c.name, to: `/shop?category=${c.id}` })),
   { name: 'New In', to: '/shop' },
 ]
-const SECONDARY = ['Our story', 'Journal', 'Sustainability', 'Stockists', 'Contact us']
+const SECONDARY = [
+  { label: 'Our story', to: '/about' },
+  { label: 'Contact us', to: '/contact' },
+  { label: 'Privacy', to: '/privacy' },
+  { label: 'Terms', to: '/terms' },
+  { label: 'Refund', to: '/refund' },
+]
 
 /**
  * Full-screen menu takeover (Zara-style).
@@ -103,16 +109,21 @@ export default function MenuOverlay({ onClose, announcement = false }) {
             className="animate-fade-up mt-auto flex flex-wrap gap-x-8 gap-y-3 pt-12"
             style={{ animationDelay: '0.7s' }}
           >
-            {SECONDARY.map((s) => (
-              <a
-                key={s}
-                href="#"
-                onClick={onClose}
-                className="text-sm text-clay transition-colors hover:text-ink"
-              >
-                {s}
-              </a>
-            ))}
+            {SECONDARY.map((s) => {
+              const label = typeof s === 'string' ? s : s.label
+              const to = typeof s === 'string' ? null : s.to
+              const cls =
+                'text-sm text-clay transition-colors hover:text-ink'
+              return to ? (
+                <Link key={label} to={to} onClick={onClose} className={cls}>
+                  {label}
+                </Link>
+              ) : (
+                <a key={label} href="#" onClick={onClose} className={cls}>
+                  {label}
+                </a>
+              )
+            })}
           </div>
         </div>
       </div>

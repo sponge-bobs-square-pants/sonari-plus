@@ -1,6 +1,17 @@
 import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
 
+/** A saved delivery address — each keeps its own _id for pick / delete. */
+const addressSchema = new mongoose.Schema({
+  fullName: { type: String, required: true, trim: true },
+  phone: { type: String, required: true, trim: true },
+  line1: { type: String, required: true, trim: true },
+  line2: { type: String, default: '', trim: true },
+  city: { type: String, required: true, trim: true },
+  state: { type: String, required: true, trim: true },
+  pincode: { type: String, required: true, trim: true },
+})
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -28,6 +39,8 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'admin'],
       default: 'user',
     },
+    // Delivery addresses the customer has chosen to save.
+    addresses: { type: [addressSchema], default: [] },
   },
   { timestamps: true },
 )

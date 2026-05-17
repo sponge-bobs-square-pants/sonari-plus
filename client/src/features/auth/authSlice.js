@@ -62,6 +62,10 @@ const authSlice = createSlice({
     clearAuthError: (state) => {
       state.error = null
     },
+    // Sync the user's saved addresses after an add / delete.
+    setAddresses: (state, action) => {
+      if (state.user) state.user.addresses = action.payload
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -98,7 +102,7 @@ const authSlice = createSlice({
   },
 })
 
-export const { clearAuthError } = authSlice.actions
+export const { clearAuthError, setAddresses } = authSlice.actions
 
 /* ── Selectors ────────────────────────────────── */
 export const selectAuthUser = (state) => state.auth.user

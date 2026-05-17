@@ -35,11 +35,12 @@ brainstorm; the exploration screens are the design references:
 - Recurring motifs: the growing-line accent, `eyebrow` uppercase labels,
   `Reveal` scroll-in animations, the `build-x` block-wipe (menu overlay).
 - Storefront is light (`canvas`); the admin panel is dark (`ink`).
-- **Full-screen landing sections**: Hero, CategoryGallery, NewArrivals and
-  BrandStory each fill the viewport via `min-h-[calc(100vh-var(--header-height))]`
-  — the `--header-height` token (`index.css`) subtracts the fixed navbar so a
-  section fits the *visible* area. Supporting rows (ValueProps, Newsletter) stay
-  natural height — full-screen is for sections with a visual payload, not utility rows.
+- **Full-screen landing sections**: Hero, CategoryGallery and NewArrivals each
+  fill the viewport via `min-h-[calc(100vh-var(--header-height))]` — the
+  `--header-height` token (`index.css`) subtracts the fixed navbar so a section
+  fits the *visible* area. Supporting rows (ValueProps, Newsletter) stay natural
+  height — full-screen is for sections with a visual payload, not utility rows.
+  (The old BrandStory "Our story" section was removed — it now lives at `/about`.)
 
 ## Conventions
 
@@ -90,10 +91,22 @@ brainstorm; the exploration screens are the design references:
   `Header` props: `solid` (force the solid state), `border`, `announcement`,
   `surface` (`'canvas'` default · `'white'` for the product page) — each page
   composes what it needs.
+- **Footer**: the full `Footer` (dark, link columns + socials) appears **only
+  on the landing page**. Inner pages have no footer — they just end. Legal
+  pages stay reachable site-wide through the menu instead: `MenuOverlay`'s
+  secondary links include Privacy / Terms / Refund.
 
 ## Roles
 
-- `user` → `/account` — Purchases · Favourites · My details (tabbed sidebar)
+- `user` → `/account` — Purchases · Favourites · My details (horizontal tabs;
+  uses the standard storefront `Header`, like every other page). The Purchases
+  tab lists orders newest-first as date-anchored cards; clicking any product
+  thumbnail expands `OrderDetailPanel` — on a wide screen, absolutely
+  positioned beside that order's images, pinned at the top and sized to its
+  content (shorter than the images), so opening it never grows the card or
+  shifts the orders below; stacks below the images on a narrow screen. Shows
+  order no., dates, return deadline, and Invoice + Track buttons (both are
+  placeholders — invoice generation and order tracking not yet built).
 - `admin` → `/admin` — dashboard hub: "Manage products" · "Configure landing page"
   (admins hitting `/account` are redirected to `/admin`)
 
@@ -102,6 +115,20 @@ brainstorm; the exploration screens are the design references:
 Landing page · auth (login / signup) · account area · admin panel (product CRUD
 with Cloudinary image uploads, variant model) · single product page
 (`/product/:id`) with colour/size selection + add-to-cart.
+
+Content pages: `/about` (the brand story — Sonari is a curated multi-brand
+store, NOT a manufacturer) and `/contact` (a front-end-only message form +
+contact details). Linked from the Footer and the menu's secondary links.
+Store email/phone/address are the `CONTACT` const at the top of
+`ContactPage.jsx`.
+
+Legal pages share `components/layout/PolicyLayout.jsx` — pass `title`,
+`updated`, `intro`, `sections` (array of `{ heading, body }`; `body` items are
+strings or `{ list: [...] }`). All three are built — `/privacy`, `/terms`, `/refund`. Legal links live in the
+Footer's `LEGAL` array. Refund policy specifics: 10-day return window,
+restocking fee = the courier's return-shipping charge, returns inspected before
+refund, damaged/incorrect claims require an unboxing video, intimates
+non-returnable for hygiene unless faulty.
 
 Cart page (`/cart`) — two columns: a grid of small item cards on the left
 (scrolls within itself past ~2 rows) and a checkout summary panel on the right
@@ -146,8 +173,57 @@ a listener middleware (`features/cart/cartListener.js`, prepended in
   into the DB cart and localStorage cleared. **On logout** Redux + localStorage
   are emptied; the DB cart stays for next time.
 
+## Checkout & payments
+
+`/checkout` (RequireAuth) — address form + order summary + Razorpay payment.
+- **Razorpay keys** switch by `NODE_ENV` (`server/src/config/razorpay.js`):
+  production → `RAZORPAY_PROD_*`, else → `RAZORPAY_DEV_*`. No code change to
+  go live — set `NODE_ENV=production` and the prod keys.
+- **Order model** (`server/src/models/Order.js`) — item snapshots, shipping
+  address, server-computed `subtotal`/`deliveryFee`/`total`, `razorpayOrderId`,
+  `paymentStatus` (`created`→`paid`/`failed`), `status` (`placed`…), and
+  `returnDeadline` — frozen at order creation as `createdAt + RETURN_WINDOW_DAYS`
+  (10, from the Refund policy; the constant lives in `orderController.js`).
+- Flow: `POST /api/orders/create` builds a pending Order + a Razorpay order
+  (totals computed server-side from the DB cart — client totals never trusted)
+  → client opens Razorpay → `POST /api/orders/verify` checks the HMAC
+  signature, marks the order paid, empties the cart, and **decrements variant
+  stock** → `/order/confirmed`.
+- On payment success, `reduceStockForOrder` lowers `colors[].sizes[].stock` for
+  each ordered variant. It runs in BOTH verify and the webhook, but the
+  `paymentStatus !== 'paid'` idempotency guard means it fires exactly once per
+  order. (Stock is not *reserved* at order-creation, so a race in the payment
+  window can still oversell by a little — reservation is a future upgrade.)
+- Delivery: free at/above ₹2,000, else **₹120** — `data/shipping.js` on the
+  client, re-declared in `orderController.js` on the server (keep in sync).
+- `GET /api/orders` backs the account "Purchases" tab.
+- **Saved addresses** — `User.addresses[]` (each with its own `_id`).
+  Checkout shows a scrollable picker of saved addresses *or* a new-address
+  form with a "Save this address" checkbox; ticking it makes `createOrder`
+  store the address on the user. `DELETE /api/users/addresses/:id` removes
+  one. The account "My details" tab lists and removes them. Redux syncs via
+  the `setAddresses` auth reducer.
+- `POST /api/orders/webhook` — Razorpay's server-to-server callback, the
+  reliable confirmation path if the browser-side verify is lost. Signature-
+  verified against the RAW body (`index.js` keeps it on `req.rawBody` via the
+  `express.json` `verify` hook); mounted before `protect` since it has no
+  session. Secret: `RAZORPAY_DEV/PROD_WEBHOOK_SECRET`. Idempotent with verify.
+- Not yet done: order-confirmation emails.
+- **Fulfilment rule:** orders exist in the DB from `/orders/create` onward with
+  `status: 'placed'` *before* payment. NEVER fulfil/ship on `status` — only on
+  `paymentStatus === 'paid'`.
+- Auto-capture is **ON** in the Razorpay dashboard, so a `paid` order means
+  money was actually captured (not merely authorised).
+
 ## Next steps
 
-- Checkout flow (cart → order). The ₹2,000 free-delivery rule applies here —
-  make it a named constant when building it.
+The full backlog of refinements lives in **`UPGRADES.md`** (project root) —
+stock reservation, admin order management, refund processing, emails, wishlist,
+the legal review, the go-live checklist, etc. Check it before starting new work
+so nothing is rebuilt or missed.
+
+Nearest-term, both detailed in `UPGRADES.md`:
+- **Admin order management** — a list of PAID orders with a per-order
+  verification check; the owner has specific verification logic, so **ask
+  before building**.
 - The admin "Configure landing page" tool (`/admin/landing` is a stub).

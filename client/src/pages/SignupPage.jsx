@@ -93,6 +93,24 @@ export default function SignupPage() {
         >
           {status === 'loading' ? 'Creating account…' : 'Create account'}
         </Button>
+
+        <p className="text-xs leading-relaxed text-clay">
+          By creating an account, you agree to our{' '}
+          <Link
+            to="/terms"
+            className="text-ink underline underline-offset-2 transition-colors hover:text-clay"
+          >
+            Terms &amp; Conditions
+          </Link>{' '}
+          and{' '}
+          <Link
+            to="/privacy"
+            className="text-ink underline underline-offset-2 transition-colors hover:text-clay"
+          >
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </form>
     </AuthLayout>
   )

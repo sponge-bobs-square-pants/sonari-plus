@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import { listProducts } from '../services/productApi'
 import { categories, sizesForCategory } from '../data/categories'
 import Header from '../components/layout/Header'
-import Footer from '../components/layout/Footer'
 import ProductCard from '../components/product/ProductCard'
 import Reveal from '../components/ui/Reveal'
 import Button from '../components/ui/Button'
@@ -208,8 +207,6 @@ export default function ShopPage() {
           )}
         </div>
       </main>
-
-      <Footer />
 
       {/* Filter dock — a chat-widget panel pinned bottom-right */}
       <FilterPanel

@@ -1,0 +1,128 @@
+# Sonari — Future Upgrades & Refinements
+
+A running backlog of things worth improving once the core store is live and
+stable. Nothing here is broken — these are *refinements*. Pick them up when
+traffic, time, or need justifies the effort.
+
+Tags: **[P1]** do before/around launch · **[P2]** soon after · **[P3]** when it
+matters at scale.
+
+---
+
+## Payments & orders
+
+### Stock reservation [P2]
+Today stock is checked at `/orders/create` and decremented only on payment
+success. A narrow race remains: two customers, the last unit, the seconds
+between "clicked Pay" and "finished paying".
+**Fix:** claim stock at checkout-start with a *single atomic conditional*
+`updateOne` (`$inc` guarded by `stock >= qty` — the loser gets
+`modifiedCount: 0` and is rejected), plus a background job that releases stock
+from orders stuck at `paymentStatus: 'created'` past a timeout, and on the
+`payment.failed` webhook. Set `expire_by` on the Razorpay order to match.
+
+### Admin order management [P1]
+No screen exists to view/fulfil orders yet. Build: a list of **paid** orders,
+each opening to a detail view with a per-order verification check (re-confirm
+Razorpay payment `status: captured` and `amount === order.total`), and controls
+to advance `status` (`placed → shipped → delivered`). Owner has specific
+verification logic — ask before building. **Fulfil only on
+`paymentStatus === 'paid'`, never `status`.**
+
+### Refund processing [P2]
+The Refund & Cancellation *policy* exists; actually *issuing* refunds does not.
+When an admin approves a return, call Razorpay's refunds API and handle the
+`refund.processed` webhook to reflect it on the order.
+
+### Order emails [P2]
+No transactional email anywhere. Add order-confirmation and shipping-update
+emails (an email provider + templates).
+
+### Order detail / history [P2]
+`/order/confirmed` reads the order from router state — a refresh loses it. Add
+a real order-detail route (`GET /api/orders/:id`) and let the account
+"Purchases" list open into it.
+
+---
+
+## Storefront & UX
+
+### Wishlist / Favourites [P2]
+The account "Favourites" tab is an empty placeholder. Build a real saved-items
+feature (and re-add the heart icon to the header).
+
+### Guest checkout [P3]
+Checkout currently requires sign-in. Consider allowing a guest to check out
+with just an email + address.
+
+### Shop scroll restoration [P3]
+Returning from a product page to `/shop` resets the infinite-scroll position
+to the top. Persist scroll offset + loaded pages (sessionStorage) and restore.
+
+### About page copy [P3]
+"How it began" still reads like a recent founding — reword it to fit the
+1999 origin date.
+
+---
+
+## Admin
+
+### "Configure landing page" tool [P2]
+`/admin/landing` is a stub. Build the tool to control hero / featured pieces /
+section order.
+
+### Product search at scale [P3]
+Admin product search uses an unanchored `$regex` — fine now, can't use an index
+well at tens of thousands of products. Add a MongoDB text index on `name`.
+
+---
+
+## Backend wiring
+
+### Contact form backend [P2]
+The `/contact` form is front-end only (`// TODO POST /api/contact`). Build the
+route — store the message and/or email it to the store.
+
+### Newsletter backend [P2]
+The homepage Newsletter section has no API. Build the subscribe route.
+
+---
+
+## Performance
+
+### Image optimization [P2]
+Category images are large (~900 KB each). Serve responsive/transformed sizes
+(Cloudinary transformations) and proper formats.
+
+### Cursor pagination for `/shop` [P3]
+`/shop` uses skip/limit pagination — fine for normal browsing. If very deep
+scrolling becomes common, `.skip()` slows down; switch to cursor-based.
+
+---
+
+## Security & hardening
+
+### Rate limiting [P2]
+Add rate limiting on auth (`/auth/login`, `/auth/register`) and order endpoints
+to blunt brute-force and abuse.
+
+### Constants kept in sync [P3]
+`FREE_DELIVERY_THRESHOLD` / `DELIVERY_FEE` are declared twice — `data/shipping.js`
+(client) and `orderController.js` (server). They must be edited together; a
+shared/config source would remove the foot-gun.
+
+---
+
+## Compliance & launch
+
+### Legal review [P1]
+Privacy Policy, Terms & Conditions, and Refund & Cancellation are solid
+standard templates — have them reviewed against Indian law (DPDP Act 2023, IT
+Act) and the payment provider's requirements before going live.
+
+### Go-live checklist [P1]
+- Razorpay: set `NODE_ENV=production` and uncomment the `RAZORPAY_PROD_*` keys
+  (the code switches automatically).
+- Update the webhook URL from the devtunnel to the real domain.
+- Run `npm run backfill:price` against the production DB if needed.
+- Confirm all contact details on `/contact` are correct.

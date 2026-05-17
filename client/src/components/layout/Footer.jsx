@@ -1,10 +1,36 @@
+import { Link } from 'react-router-dom'
+
+// Items are plain strings (placeholder `#` links) or { label, to }
+// objects for ones with a real page.
 const COLUMNS = [
   { title: 'Shop', items: ['Cordset', 'Night suits', 'Bras', 'Panties', 'New In'] },
-  { title: 'Help', items: ['Size guide', 'Delivery & returns', 'Fabric care', 'Contact us'] },
-  { title: 'Sonari', items: ['Our story', 'Sustainability', 'Stockists', 'Journal'] },
+  {
+    title: 'Help',
+    items: [
+      'Size guide',
+      'Delivery & returns',
+      'Fabric care',
+      { label: 'Contact us', to: '/contact' },
+    ],
+  },
+  {
+    title: 'Sonari',
+    items: [
+      { label: 'Our story', to: '/about' },
+      'Sustainability',
+      'Stockists',
+      'Journal',
+    ],
+  },
 ]
 
 const SOCIALS = ['Instagram', 'Pinterest', 'Facebook']
+
+const LEGAL = [
+  { label: 'Privacy policy', to: '/privacy' },
+  { label: 'Terms & Conditions', to: '/terms' },
+  { label: 'Refund & Cancellation', to: '/refund' },
+]
 
 export default function Footer() {
   return (
@@ -28,16 +54,25 @@ export default function Footer() {
               <div key={col.title}>
                 <h4 className="eyebrow text-[0.625rem] text-dusk">{col.title}</h4>
                 <ul className="mt-5 space-y-3">
-                  {col.items.map((item) => (
-                    <li key={item}>
-                      <a
-                        href="#"
-                        className="text-sm text-canvas/65 transition-colors hover:text-canvas"
-                      >
-                        {item}
-                      </a>
-                    </li>
-                  ))}
+                  {col.items.map((item) => {
+                    const label = typeof item === 'string' ? item : item.label
+                    const to = typeof item === 'string' ? null : item.to
+                    const cls =
+                      'text-sm text-canvas/65 transition-colors hover:text-canvas'
+                    return (
+                      <li key={label}>
+                        {to ? (
+                          <Link to={to} className={cls}>
+                            {label}
+                          </Link>
+                        ) : (
+                          <a href="#" className={cls}>
+                            {label}
+                          </a>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             ))}
@@ -46,7 +81,24 @@ export default function Footer() {
 
         {/* Lower bar */}
         <div className="mt-16 flex flex-col gap-5 border-t border-canvas/12 pt-8 text-xs text-canvas/45 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} Sonari Nightwear. All rights reserved.</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <p>
+              © {new Date().getFullYear()} Sonari Nightwear. All rights
+              reserved.
+            </p>
+            <ul className="flex gap-5">
+              {LEGAL.map((l) => (
+                <li key={l.label}>
+                  <Link
+                    to={l.to}
+                    className="transition-colors hover:text-canvas"
+                  >
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
           <ul className="flex gap-6">
             {SOCIALS.map((s) => (
               <li key={s}>

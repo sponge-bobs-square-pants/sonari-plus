@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { getProduct } from '../services/productApi'
-import { addItem } from '../features/cart/cartSlice'
+import { addItem, selectCartItems } from '../features/cart/cartSlice'
 import { formatPrice } from '../utils/format'
 import Header from '../components/layout/Header'
-import Footer from '../components/layout/Footer'
 import Button from '../components/ui/Button'
 import Placeholder from '../components/ui/Placeholder'
 
 export default function ProductPage() {
   const { id } = useParams()
   const dispatch = useDispatch()
+  const cartItems = useSelector(selectCartItems)
 
   const [product, setProduct] = useState(null)
   const [status, setStatus] = useState('loading') // loading | ready | error
@@ -57,7 +57,6 @@ export default function ProductPage() {
             {status === 'error' ? error : 'Loading…'}
           </p>
         </main>
-        <Footer />
       </>
     )
   }
@@ -82,6 +81,16 @@ export default function ProductPage() {
     if (!size) return setHint('Please select a size')
     if (!selectedVariant || selectedVariant.stock < 1) {
       return setHint('That size is out of stock')
+    }
+    // Don't let cart quantity exceed what's in stock for this variant.
+    const lineId = `${product._id}__${color.name}__${size}`
+    const inCart = cartItems.find((i) => i.lineId === lineId)?.quantity || 0
+    if (inCart + qty > selectedVariant.stock) {
+      return setHint(
+        inCart > 0
+          ? `Only ${selectedVariant.stock} in stock — you already have ${inCart} in your bag`
+          : `Only ${selectedVariant.stock} left in stock`,
+      )
     }
     dispatch(
       addItem({
@@ -291,8 +300,6 @@ export default function ProductPage() {
           </div>
         </div>
       </main>
-
-      <Footer />
     </>
   )
 }

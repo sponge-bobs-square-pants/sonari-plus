@@ -9,7 +9,6 @@ import {
 } from '../features/cart/cartSlice'
 import { getProduct } from '../services/productApi'
 import Header from '../components/layout/Header'
-import Footer from '../components/layout/Footer'
 import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
 import Placeholder from '../components/ui/Placeholder'
@@ -17,9 +16,10 @@ import { formatPrice } from '../utils/format'
 import { FREE_DELIVERY_THRESHOLD } from '../data/shipping'
 
 /* ── Quantity stepper ─────────────────────────────
-   Minus is disabled at 1 — removal is a deliberate, separate action,
-   not something you fall into by tapping minus once too often. */
-function QtyStepper({ value, onChange }) {
+   Minus is disabled at 1 — removal is a deliberate, separate action.
+   Plus is disabled at `max` — the variant's available stock. */
+function QtyStepper({ value, max, onChange }) {
+  const atMax = max != null && value >= max
   return (
     <div className="inline-flex items-center">
       <button
@@ -35,8 +35,9 @@ function QtyStepper({ value, onChange }) {
       <button
         type="button"
         onClick={() => onChange(value + 1)}
+        disabled={atMax}
         aria-label="Increase quantity"
-        className="flex h-6 w-6 cursor-pointer items-center justify-center text-clay transition-colors hover:text-ink"
+        className="flex h-6 w-6 cursor-pointer items-center justify-center text-clay transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-clay"
       >
         +
       </button>
@@ -47,7 +48,8 @@ function QtyStepper({ value, onChange }) {
 /* ── One cart card — small: cover photo on top, compact details below.
    The card stays a fixed, modest width; the grid packs as many across
    a row as fit. ──*/
-function CartCard({ item, cover, onQty, onRemove }) {
+function CartCard({ item, cover, stock, onQty, onRemove }) {
+  const atStockCap = stock != null && item.quantity >= stock
   return (
     <li className="flex w-[8.5rem] flex-col">
       <Link
@@ -92,8 +94,13 @@ function CartCard({ item, cover, onQty, onRemove }) {
           >
             Delete
           </button>
-          <QtyStepper value={item.quantity} onChange={onQty} />
+          <QtyStepper value={item.quantity} max={stock} onChange={onQty} />
         </div>
+        {atStockCap && (
+          <p className="mt-1.5 text-[0.625rem] text-dusk">
+            Only {stock} in stock
+          </p>
+        )}
       </div>
     </li>
   )
@@ -122,12 +129,9 @@ export default function CartPage() {
   const subtotal = useSelector(selectCartTotal)
   const dispatch = useDispatch()
 
-  // Checkout doesn't exist yet — show a gentle note instead of a dead end.
-  const [note, setNote] = useState('')
-
-  // Cart lines store a snapshot, but the thumbnail should track the
-  // product's CURRENT cover photo — so look it up live, keyed by id.
-  const [covers, setCovers] = useState({})
+  // Cart lines are snapshots — fetch each product live so we can show
+  // the CURRENT cover photo and cap quantity at the CURRENT stock.
+  const [products, setProducts] = useState({}) // productId -> product
   const idsKey = [...new Set(items.map((i) => i.productId))].join(',')
 
   useEffect(() => {
@@ -137,17 +141,30 @@ export default function CartPage() {
     Promise.all(
       ids.map((id) =>
         getProduct(id).then(
-          (p) => [id, p.images?.[0] || p.colors?.[0]?.images?.[0] || ''],
-          () => [id, ''], // product gone / fetch failed — fall back below
+          (p) => [id, p],
+          () => [id, null], // product gone / fetch failed
         ),
       ),
     ).then((pairs) => {
-      if (active) setCovers(Object.fromEntries(pairs))
+      if (active) setProducts(Object.fromEntries(pairs))
     })
     return () => {
       active = false
     }
   }, [idsKey])
+
+  // Cover photo + available stock for a cart line, from the live product.
+  const coverFor = (item) => {
+    const p = products[item.productId]
+    return p?.images?.[0] || p?.colors?.[0]?.images?.[0] || item.image
+  }
+  const stockFor = (item) => {
+    const p = products[item.productId]
+    if (!p) return undefined // not loaded yet — don't cap prematurely
+    return p.colors
+      ?.find((c) => c.name === item.color)
+      ?.sizes?.find((s) => s.size === item.size)?.stock
+  }
 
   const qualifies = subtotal >= FREE_DELIVERY_THRESHOLD
   const remaining = Math.max(0, FREE_DELIVERY_THRESHOLD - subtotal)
@@ -170,7 +187,8 @@ export default function CartPage() {
                   <CartCard
                     key={item.lineId}
                     item={item}
-                    cover={covers[item.productId] || item.image}
+                    cover={coverFor(item)}
+                    stock={stockFor(item)}
                     onQty={(q) =>
                       dispatch(
                         updateQuantity({ lineId: item.lineId, quantity: q }),
@@ -214,19 +232,14 @@ export default function CartPage() {
                     </div>
                   )}
 
-                  {/* TODO: route to /checkout once the checkout flow exists. */}
                   <Button
+                    as={Link}
+                    to="/checkout"
                     variant="solid"
                     className="mt-6 w-full"
-                    onClick={() =>
-                      setNote('Checkout is coming soon — hold tight.')
-                    }
                   >
                     Checkout
                   </Button>
-                  {note && (
-                    <p className="mt-3 text-center text-xs text-clay">{note}</p>
-                  )}
 
                   <Link
                     to="/shop"
@@ -240,8 +253,6 @@ export default function CartPage() {
           )}
         </div>
       </main>
-
-      <Footer />
     </>
   )
 }
