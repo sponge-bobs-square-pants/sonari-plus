@@ -3,13 +3,14 @@ import Header from '../components/layout/Header'
 import TextField from '../components/ui/TextField'
 import Button from '../components/ui/Button'
 import Reveal from '../components/ui/Reveal'
+import { BRAND } from '../data/brand'
 
 const CONTACT = {
   email: 'chawla1310@gmail.com',
   phone: '+91 94275 42349',
   hours: 'Monday – Saturday · 10am – 6pm IST',
   address: [
-    'Sonari Nightwear',
+    `${BRAND.legalName} Nightwear`,
     'Sneh Sudha Complex, opp. Sursagar Lake',
     'Vadodara, Gujarat 390001',
   ],

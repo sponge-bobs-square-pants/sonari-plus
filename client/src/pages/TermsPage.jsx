@@ -1,15 +1,15 @@
 import PolicyLayout from '../components/layout/PolicyLayout'
+import { BRAND } from '../data/brand'
 
 const UPDATED = '17 May 2026'
 
-const INTRO =
-  'These Terms & Conditions govern your use of the Sonari Nightwear website and any purchase you make from it. Please read them carefully — by browsing the site or placing an order, you agree to be bound by these terms.'
+const INTRO = `These Terms & Conditions govern your use of the ${BRAND.legalName} Nightwear website and any purchase you make from it. Please read them carefully — by browsing the site or placing an order, you agree to be bound by these terms.`
 
 const SECTIONS = [
   {
     heading: 'About us',
     body: [
-      'Sonari Nightwear is a family-run store offering women’s nightwear, sleepwear and intimates sourced from a range of trusted brands. In these terms, “we”, “us” and “our” refer to Sonari Nightwear; “you” refers to the person using the website or placing an order.',
+      `${BRAND.legalName} Nightwear is a family-run store offering women’s nightwear, sleepwear and intimates sourced from a range of trusted brands. In these terms, “we”, “us” and “our” refer to ${BRAND.legalName} Nightwear; “you” refers to the person using the website or placing an order.`,
     ],
   },
   {
@@ -70,7 +70,7 @@ const SECTIONS = [
   {
     heading: 'Intellectual property',
     body: [
-      'The content of this website — including its text, design, layout, logos and images — belongs to Sonari Nightwear or its partners and licensors. You may not copy, reproduce or reuse it without our written permission.',
+      `The content of this website — including its text, design, layout, logos and images — belongs to ${BRAND.legalName} Nightwear or its partners and licensors. You may not copy, reproduce or reuse it without our written permission.`,
     ],
   },
   {
@@ -106,7 +106,7 @@ const SECTIONS = [
         list: [
           'Email — chawla1310@gmail.com',
           'Phone — +91 94275 42349',
-          'Sonari Nightwear, Sneh Sudha Complex, opp. Sursagar Lake, Vadodara, Gujarat 390001',
+          `${BRAND.legalName} Nightwear, Sneh Sudha Complex, opp. Sursagar Lake, Vadodara, Gujarat 390001`,
         ],
       },
     ],

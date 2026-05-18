@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import Placeholder from '../ui/Placeholder'
+import { BRAND } from '../../data/brand'
 
 /**
  * Shared shell for the login & signup pages — a 50/50 split with the
@@ -18,7 +19,7 @@ export default function AuthLayout({ intro, title, children, footer }) {
           <span className="transition-transform duration-300 group-hover:-translate-x-1">
             ←
           </span>
-          Back to Sonari
+          Back to {BRAND.name}
         </Link>
 
         <div className="flex flex-1 flex-col justify-center py-12">

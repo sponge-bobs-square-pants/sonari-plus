@@ -407,7 +407,11 @@ export async function generateBillOfSupply(req, res, next) {
         {
           folder: 'sonari/bills',
           resource_type: 'raw',
-          public_id: number.replace(/\//g, '-'),
+          // The `.pdf` MUST be part of the public_id — for `raw` assets
+          // Cloudinary treats the public_id literally and appends nothing,
+          // so without it the delivered URL has no extension and the
+          // browser serves it as octet-stream (a file that isn't a .pdf).
+          public_id: `${number.replace(/\//g, '-')}.pdf`,
         },
         (err, result) => (err ? reject(err) : resolve(result.secure_url)),
       )
@@ -421,6 +425,108 @@ export async function generateBillOfSupply(req, res, next) {
     res.json({ order })
   } catch (err) {
     console.error('[bill] generation failed:', err.message)
+    next(err)
+  }
+}
+
+// Return window — the Refund & Cancellation policy's 10 days; stamped onto
+// `returnDeadline` when an order is delivered (the window starts on
+// receipt). Keep in step with the policy pages.
+const RETURN_WINDOW_DAYS = 10
+const DAY_MS = 24 * 60 * 60 * 1000
+// Couriers the admin may dispatch with — mirrors the Order model's enum.
+const COURIERS = ['delhivery', 'bluedart', 'indiapost']
+
+/**
+ * POST /api/orders/admin/:id/dispatch — record the courier + tracking ID
+ * and advance `accepted → dispatched`. Body: `{ courier, trackingId }`.
+ */
+export async function dispatchOrder(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id).populate(
+      'user',
+      'name email',
+    )
+    if (!order) return res.status(404).json({ message: 'Order not found.' })
+
+    // Fulfil only on a genuinely paid order, never on `status` alone.
+    if (order.paymentStatus !== 'paid') {
+      return res
+        .status(400)
+        .json({ message: 'Only a paid order can be dispatched.' })
+    }
+    if (order.status !== 'accepted') {
+      return res.status(400).json({
+        message: 'Only an accepted order can be dispatched.',
+      })
+    }
+
+    const courier = String(req.body.courier || '').trim()
+    const trackingId = String(req.body.trackingId || '').trim()
+    if (!COURIERS.includes(courier)) {
+      return res.status(400).json({ message: 'Choose a valid courier.' })
+    }
+    if (!trackingId) {
+      return res.status(400).json({ message: 'A tracking ID is required.' })
+    }
+
+    order.courier = courier
+    order.trackingId = trackingId
+    order.status = 'dispatched'
+    await order.save()
+    res.json({ order })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * POST /api/orders/admin/:id/deliver — advance `dispatched → delivered` and
+ * stamp `returnDeadline` (delivery date + the return window). The return
+ * window only starts on receipt, so this is the first time it can be set.
+ */
+export async function markOrderDelivered(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id).populate(
+      'user',
+      'name email',
+    )
+    if (!order) return res.status(404).json({ message: 'Order not found.' })
+    if (order.status !== 'dispatched') {
+      return res.status(400).json({
+        message: 'Only a dispatched order can be marked delivered.',
+      })
+    }
+
+    order.status = 'delivered'
+    order.returnDeadline = new Date(Date.now() + RETURN_WINDOW_DAYS * DAY_MS)
+    await order.save()
+    res.json({ order })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * POST /api/orders/admin/:id/fail-delivery — advance `dispatched →
+ * failed-delivery` (the courier could not deliver the parcel).
+ */
+export async function markDeliveryFailed(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id).populate(
+      'user',
+      'name email',
+    )
+    if (!order) return res.status(404).json({ message: 'Order not found.' })
+    if (order.status !== 'dispatched') {
+      return res.status(400).json({
+        message: 'Only a dispatched order can be marked failed delivery.',
+      })
+    }
+    order.status = 'failed-delivery'
+    await order.save()
+    res.json({ order })
+  } catch (err) {
     next(err)
   }
 }

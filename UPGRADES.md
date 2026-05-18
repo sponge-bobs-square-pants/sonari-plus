@@ -1,4 +1,4 @@
-# Sonari — Future Upgrades & Refinements
+# nuit — Future Upgrades & Refinements
 
 A running backlog of things worth improving once the core store is live and
 stable. Nothing here is broken — these are *refinements*. Pick them up when
@@ -22,12 +22,20 @@ from orders stuck at `paymentStatus: 'created'` past a timeout, and on the
 `payment.failed` webhook. Set `expire_by` on the Razorpay order to match.
 
 ### Admin order management [P1]
-No screen exists to view/fulfil orders yet. Build: a list of **paid** orders,
-each opening to a detail view with a per-order verification check (re-confirm
-Razorpay payment `status: captured` and `amount === order.total`), and controls
-to advance `status` (`placed → shipped → delivered`). Owner has specific
-verification logic — ask before building. **Fulfil only on
-`paymentStatus === 'paid'`, never `status`.**
+**Done:** the `/admin/orders` list + two-column master/detail, filters,
+New/seen tracking, the per-order Razorpay verification check, Bill of
+Supply generation (`→ accepted`), and the **order fulfilment controls** —
+admin dispatch (courier + tracking ID, `accepted → dispatched`), `→
+delivered` (stamps `returnDeadline`), and `→ failed-delivery`. All guard
+`paymentStatus === 'paid'` and the required current status.
+
+**Next — customer order-tracking UI** (the active piece of work): the
+account "Track" button (today a placeholder) goes live once an order has
+`courier` + `trackingId`. **Decided — the proxied approach:** our backend
+calls each courier's tracking API (Delhivery / BlueDart / India Post) and
+we render the status timeline in-app. The order's `courier` field tells the
+backend which API to call. Needs a tracking-API account/credentials with
+each courier — set up when this is built.
 
 ### Refund processing [P2]
 The Refund & Cancellation *policy* exists; actually *issuing* refunds does not.

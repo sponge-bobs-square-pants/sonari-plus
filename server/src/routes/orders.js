@@ -7,6 +7,9 @@ import {
   markOrderSeen,
   verifyOrderPayment,
   generateBillOfSupply,
+  dispatchOrder,
+  markOrderDelivered,
+  markDeliveryFailed,
   listBills,
   razorpayWebhook,
 } from '../controllers/orderController.js'
@@ -31,5 +34,8 @@ router.get('/admin/bills', requireAdmin, listBills)
 router.post('/admin/:id/seen', requireAdmin, markOrderSeen)
 router.post('/admin/:id/verify', requireAdmin, verifyOrderPayment)
 router.post('/admin/:id/bill', requireAdmin, generateBillOfSupply)
+router.post('/admin/:id/dispatch', requireAdmin, dispatchOrder)
+router.post('/admin/:id/deliver', requireAdmin, markOrderDelivered)
+router.post('/admin/:id/fail-delivery', requireAdmin, markDeliveryFailed)
 
 export default router

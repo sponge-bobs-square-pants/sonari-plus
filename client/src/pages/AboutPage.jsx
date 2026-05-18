@@ -3,6 +3,7 @@ import Header from '../components/layout/Header'
 import Button from '../components/ui/Button'
 import Placeholder from '../components/ui/Placeholder'
 import Reveal from '../components/ui/Reveal'
+import { BRAND } from '../data/brand'
 
 /* The three things the brand holds to — kept as data so the section
    stays a clean map. */
@@ -36,7 +37,7 @@ export default function AboutPage() {
               Rest should feel like nothing at all.
             </h1>
             <p className="mx-auto mt-7 max-w-xl text-base leading-relaxed text-clay">
-              Sonari is a family-run nightwear store — a considered edit of
+              {BRAND.name} is a family-run nightwear store — a considered edit of
               sleepwear and intimates, gathered from labels we trust and
               brought together in one calm place.
             </p>
@@ -64,7 +65,7 @@ export default function AboutPage() {
                 It began with a simple search.
               </h2>
               <p className="mt-6 text-sm leading-relaxed text-clay">
-                Sonari grew out of a familiar frustration — nightwear that
+                {BRAND.name} grew out of a familiar frustration — nightwear that
                 looked lovely on the rack but never quite felt it, scattered
                 across a dozen shops and a hundred browser tabs. We wanted one
                 place that had already done the looking.

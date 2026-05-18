@@ -1,7 +1,10 @@
-# Sonari Nightwear
+# nuit
 
 A MERN e-commerce store for women's nightwear & intimates (the owner's family
 business). `client/` — Vite + React frontend · `server/` — Express + MongoDB API.
+
+The consumer brand is **nuit**; the GST-registered legal entity is **Ashok
+Chawla HUF**, trade name **Sonari Night Wear**.
 
 This file is a **map**, not a copy — it points to the files where decisions live
 so they never go stale. Read the referenced files for detail.
@@ -53,6 +56,15 @@ brainstorm; the exploration screens are the design references:
 
 ## Conventions
 
+- **Brand name** — never hardcoded. It flows from `client/src/data/brand.js`:
+  `BRAND.name` is the consumer brand ("nuit"); `BRAND.legalName` is the
+  GST-registered name on policy pages, checkout and the footer copyright.
+  They're separate groups so the legal name can switch on its own —
+  `legalName` is currently `'Sonari'`, pending the CA's sign-off on the
+  rename. The logo is the `Wordmark` SVG (`components/brand/Wordmark.jsx`),
+  drawn `fill="currentColor"` so it takes its context's colour. The server
+  keeps its own copy of the legal/trade name (for the Bill of Supply) in
+  `server/src/config/store.js`.
 - Prices: always `formatPrice()` from `client/src/utils/format.js` — INR, "₹ 849".
 - India-only shipping; free delivery at/over ₹2,000 → `FREE_DELIVERY_THRESHOLD`
   in `client/src/data/shipping.js` (the single source of truth — used by the
@@ -118,8 +130,10 @@ brainstorm; the exploration screens are the design references:
   positioned beside that order's images, pinned at the top and sized to its
   content (shorter than the images), so opening it never grows the card or
   shifts the orders below; stacks below the images on a narrow screen. Shows
-  order no., dates, return deadline, and Invoice + Track buttons (both are
-  placeholders — invoice generation and order tracking not yet built).
+  order no., dates, return deadline, and Invoice + Track buttons.
+  **Invoice** links to the order's Bill of Supply PDF once an admin has
+  generated it (disabled until then); **Track** is still a placeholder —
+  order tracking not yet built.
 - `admin` → `/admin` — dashboard hub: "Orders" (`/admin/orders`) · "Bills"
   (`/admin/bills`) · "Manage products" · "Configure landing page" (admins
   hitting `/account` → `/admin`)
@@ -130,7 +144,7 @@ Landing page · auth (login / signup) · account area · admin panel (product CR
 with Cloudinary image uploads, variant model) · single product page
 (`/product/:id`) with colour/size selection + add-to-cart.
 
-Content pages: `/about` (the brand story — Sonari is a curated multi-brand
+Content pages: `/about` (the brand story — nuit is a curated multi-brand
 store, NOT a manufacturer) and `/contact` (a front-end-only message form +
 contact details). Linked from the Footer and the menu's secondary links.
 Store email/phone/address are the `CONTACT` const at the top of
@@ -242,11 +256,23 @@ a listener middleware (`features/cart/cartListener.js`, prepended in
   `POST /api/orders/admin/:id/bill` (admin) renders the PDF (`pdfkit`,
   `server/src/utils/billOfSupply.js`), hosts it on Cloudinary (raw), stores
   `billOfSupply` on the order, and advances `placed → accepted`. A Bill of
-  Supply is never re-issued. The customer's account "Invoice" button links
-  to the hosted PDF. The admin **Bills** page (`/admin/bills` →
+  Supply is never re-issued. The PDF ("Nocturne" layout — dark night bands
+  framing the page, a crescent moon dotting the wordmark) paginates for
+  large orders: items flow across pages, continuation pages get a compact
+  header, the totals stay whole on the last page. Preview it without a live
+  order via `cd server && node preview-bill.mjs`. The customer's account
+  "Invoice" button links to the hosted PDF. The admin **Bills** page (`/admin/bills` →
   `GET /api/orders/admin/bills`) is the GST register: every Bill of Supply,
   filterable by issued-date range (3 year presets + custom), with count +
   turnover + 1% composition GST aggregated server-side over the whole range.
+- **Order fulfilment** (admin). Three admin actions advance a paid order's
+  `status`: `POST /admin/:id/dispatch` (body `{ courier, trackingId }` →
+  `accepted → dispatched`), `POST /admin/:id/deliver` (`→ delivered`, stamps
+  `returnDeadline` = now + 10 days), `POST /admin/:id/fail-delivery` (`→
+  failed-delivery`). Each guards `paymentStatus === 'paid'` and the required
+  current status. The controls live in the `AdminOrdersPage` order detail
+  (`FulfilmentSection`) — a courier picker + tracking-ID field when
+  `accepted`, deliver / failed-delivery buttons when `dispatched`.
 - **Saved addresses** — `User.addresses[]` (each with its own `_id`).
   Checkout shows a scrollable picker of saved addresses *or* a new-address
   form with a "Save this address" checkbox; ticking it makes `createOrder`
@@ -277,8 +303,12 @@ so nothing is rebuilt or missed.
 Nearest-term:
 - **Admin order management** — IN PROGRESS. Done: the Orders list +
   two-column detail, filters, New/seen tracking, the Razorpay verify check,
-  and Bill of Supply generation (admin "Generate Bill of Supply" → PDF on
-  Cloudinary → `accepted`). Still to come: courier dispatch (`→ dispatched`,
-  with the backend-proxied courier tracking), the rest of the fulfilment
-  controls (`→ delivered` / `failed-delivery`), and refund processing.
+  Bill of Supply generation (→ `accepted`), and the **order fulfilment
+  controls** — admin dispatch / delivered / failed-delivery. **Next: the
+  customer-facing order-tracking UI** — decided: proxied courier tracking,
+  where our backend calls the Delhivery / BlueDart / India Post tracking
+  APIs (the order's `courier` field selects which) and we render the
+  timeline in-app. The Delhivery integration is specced in **`DELHIVERY.md`**
+  (project root). See `UPGRADES.md` → Admin order management. Refund
+  processing follows.
 - The admin "Configure landing page" tool (`/admin/landing` is a stub).

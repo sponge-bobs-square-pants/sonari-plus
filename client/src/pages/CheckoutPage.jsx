@@ -10,6 +10,7 @@ import { selectAuthUser, loadUser } from '../features/auth/authSlice'
 import { createOrder, verifyPayment } from '../services/orderApi'
 import { loadRazorpay } from '../utils/razorpay'
 import { FREE_DELIVERY_THRESHOLD, DELIVERY_FEE } from '../data/shipping'
+import { BRAND } from '../data/brand'
 import Header from '../components/layout/Header'
 import Button from '../components/ui/Button'
 import TextField from '../components/ui/TextField'
@@ -120,7 +121,7 @@ export default function CheckoutPage() {
       amount: data.amount,
       currency: data.currency,
       order_id: data.razorpayOrderId,
-      name: 'Sonari Nightwear',
+      name: `${BRAND.legalName} Nightwear`,
       description: 'Order payment',
       prefill: {
         name: shipping.fullName,

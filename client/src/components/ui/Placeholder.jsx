@@ -1,3 +1,5 @@
+import Wordmark from '../brand/Wordmark'
+
 /**
  * Tonal image placeholder.
  *
@@ -41,8 +43,8 @@ export default function Placeholder({
           <div className="absolute -inset-1/4 bg-[radial-gradient(circle_at_30%_22%,rgba(255,255,255,0.4),transparent_62%)]" />
           <div className="grain absolute inset-0 opacity-55" />
           {mark && (
-            <span className="pointer-events-none absolute inset-0 flex select-none items-center justify-center font-display font-light tracking-[0.5em] text-ink/[0.07] text-[clamp(0.9rem,3.5vw,2rem)]">
-              SONARI
+            <span className="pointer-events-none absolute inset-0 flex select-none items-center justify-center">
+              <Wordmark className="w-2/5 text-ink/[0.07]" />
             </span>
           )}
         </>

@@ -11,6 +11,7 @@ import {
 import AuthLayout from '../components/auth/AuthLayout'
 import TextField from '../components/ui/TextField'
 import Button from '../components/ui/Button'
+import { BRAND } from '../data/brand'
 
 export default function LoginPage() {
   const dispatch = useDispatch()
@@ -44,10 +45,10 @@ export default function LoginPage() {
   return (
     <AuthLayout
       intro="Welcome back"
-      title="Log in to Sonari"
+      title={`Log in to ${BRAND.name}`}
       footer={
         <>
-          New to Sonari?{' '}
+          New to {BRAND.name}?{' '}
           <Link
             to="/signup"
             replace

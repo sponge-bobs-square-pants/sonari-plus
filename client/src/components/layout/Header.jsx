@@ -5,6 +5,7 @@ import { selectCartCount } from '../../features/cart/cartSlice'
 import { selectAuthUser } from '../../features/auth/authSlice'
 import useScrolled from '../../hooks/useScrolled'
 import Icon from '../ui/Icon'
+import Wordmark from '../brand/Wordmark'
 import AnnouncementBar from './AnnouncementBar'
 import MenuOverlay from './MenuOverlay'
 
@@ -72,11 +73,8 @@ export default function Header({
             </div>
 
             {/* Center — wordmark, links home */}
-            <Link
-              to="/"
-              className="font-display text-xl font-light tracking-[0.42em] pl-[0.42em]"
-            >
-              SONARI
+            <Link to="/" className="flex items-center">
+              <Wordmark className="h-16 w-auto" label="nuit — home" />
             </Link>
 
             {/* Right — utilities */}

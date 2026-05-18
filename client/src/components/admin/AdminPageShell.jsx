@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { logout } from '../../features/auth/authSlice'
+import Wordmark from '../brand/Wordmark'
 
 /**
  * Shared chrome for every admin page — a top bar with a back link
@@ -77,11 +78,9 @@ export default function AdminPageShell({
           </button>
           <Link
             to="/"
-            className={`-mr-[0.4em] font-display text-xl font-light tracking-[0.4em] ${
-              dark ? 'text-canvas' : 'text-ink'
-            }`}
+            className={`flex items-center ${dark ? 'text-canvas' : 'text-ink'}`}
           >
-            SONARI
+            <Wordmark className="h-12 w-auto" label="nuit — home" />
           </Link>
         </div>
       </header>

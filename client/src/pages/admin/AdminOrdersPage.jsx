@@ -4,6 +4,9 @@ import {
   markOrderSeen,
   verifyOrder,
   generateBill,
+  dispatchOrder,
+  markDelivered,
+  markDeliveryFailed,
 } from '../../services/orderApi'
 import AdminPageShell from '../../components/admin/AdminPageShell'
 import Icon from '../../components/ui/Icon'
@@ -184,8 +187,10 @@ function FilterBar({ filters, onChange, search, onSearchChange }) {
         options={[
           ['', 'All'],
           ['placed', 'Placed'],
-          ['shipped', 'Shipped'],
+          ['accepted', 'Accepted'],
+          ['dispatched', 'Dispatched'],
           ['delivered', 'Delivered'],
+          ['failed-delivery', 'Failed delivery'],
           ['cancelled', 'Cancelled'],
         ]}
       />
@@ -296,6 +301,152 @@ function VerifyPanel({ order, verifying, error, onRecheck }) {
   )
 }
 
+/* ── Fulfilment — courier dispatch + delivery outcome ── */
+const COURIER_OPTIONS = [
+  ['delhivery', 'Delhivery'],
+  ['bluedart', 'BlueDart'],
+  ['indiapost', 'India Post'],
+]
+const COURIER_LABEL = Object.fromEntries(COURIER_OPTIONS)
+
+/**
+ * The fulfilment block — shows the control that fits the order's current
+ * status: a dispatch form when `accepted`, deliver / failed-delivery
+ * buttons when `dispatched`, a read-only outcome thereafter. Keyed by
+ * order id so the dispatch form's inputs reset between orders.
+ */
+function FulfilmentSection({
+  order,
+  busy,
+  error,
+  onDispatch,
+  onDeliver,
+  onFailDelivery,
+}) {
+  const [courier, setCourier] = useState('')
+  const [trackingId, setTrackingId] = useState('')
+
+  const shipment = order.courier && (
+    <p className="mt-2 text-sm text-canvas/80">
+      {COURIER_LABEL[order.courier] || order.courier} ·{' '}
+      <span className="text-canvas">{order.trackingId}</span>
+    </p>
+  )
+
+  return (
+    <div className="mt-8 border-t border-canvas/10 pt-6">
+      <p className="eyebrow text-canvas/40">Fulfilment</p>
+
+      {order.status === 'placed' && (
+        <p className="mt-2 text-xs text-canvas/45">
+          Generate the Bill of Supply first — an order is dispatched once it
+          has been accepted.
+        </p>
+      )}
+
+      {order.status === 'accepted' && (
+        <div className="mt-3">
+          <div className="flex flex-wrap items-end gap-5">
+            <label className="flex flex-col gap-1.5">
+              <span className="eyebrow text-canvas/40">Courier</span>
+              <select
+                value={courier}
+                onChange={(e) => setCourier(e.target.value)}
+                style={{ colorScheme: 'dark' }}
+                className="cursor-pointer border-b border-canvas/25 bg-transparent py-1 text-sm text-canvas transition-colors focus:border-canvas/60 focus:outline-none"
+              >
+                <option value="" className="bg-ink text-canvas">
+                  Select courier
+                </option>
+                {COURIER_OPTIONS.map(([v, l]) => (
+                  <option key={v} value={v} className="bg-ink text-canvas">
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="eyebrow text-canvas/40">Tracking ID</span>
+              <input
+                type="text"
+                value={trackingId}
+                onChange={(e) => setTrackingId(e.target.value)}
+                placeholder="Courier AWB number"
+                className="w-52 border-b border-canvas/25 bg-transparent py-1 text-sm text-canvas placeholder:text-canvas/35 transition-colors focus:border-canvas/60 focus:outline-none"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => onDispatch(courier, trackingId.trim())}
+              disabled={busy || !courier || !trackingId.trim()}
+              className="eyebrow cursor-pointer rounded-full border border-canvas px-5 py-2.5 text-canvas transition-colors hover:bg-canvas hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {busy ? 'Saving…' : 'Mark dispatched'}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-canvas/40">
+            Enter the courier and tracking ID from the booked shipment.
+          </p>
+        </div>
+      )}
+
+      {order.status === 'dispatched' && (
+        <div className="mt-2.5">
+          {shipment}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={onDeliver}
+              disabled={busy}
+              className="eyebrow cursor-pointer rounded-full border border-canvas px-5 py-2.5 text-canvas transition-colors hover:bg-canvas hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {busy ? 'Saving…' : 'Mark delivered'}
+            </button>
+            <button
+              type="button"
+              onClick={onFailDelivery}
+              disabled={busy}
+              className="eyebrow cursor-pointer rounded-full border border-canvas/30 px-5 py-2.5 text-canvas/70 transition-colors hover:border-dusk hover:text-dusk disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Failed delivery
+            </button>
+          </div>
+        </div>
+      )}
+
+      {order.status === 'delivered' && (
+        <div className="mt-2.5">
+          {shipment}
+          <p className="mt-3 text-sm text-canvas/80">
+            Delivered
+            {order.returnDeadline && (
+              <span className="text-canvas/45">
+                {' '}
+                · return window until {formatDate(order.returnDeadline)}
+              </span>
+            )}
+          </p>
+        </div>
+      )}
+
+      {order.status === 'failed-delivery' && (
+        <div className="mt-2.5">
+          {shipment}
+          <p className="mt-3 text-sm text-dusk">
+            Delivery failed — the courier could not deliver this parcel.
+          </p>
+        </div>
+      )}
+
+      {order.status === 'cancelled' && (
+        <p className="mt-2 text-xs text-canvas/45">This order was cancelled.</p>
+      )}
+
+      {error && <p className="mt-3 text-xs text-dusk">{error}</p>}
+    </div>
+  )
+}
+
 /* ── Right-hand detail of the selected order ─────── */
 function OrderDetail({
   order,
@@ -305,6 +456,11 @@ function OrderDetail({
   billBusy,
   billError,
   onGenerateBill,
+  fulfilBusy,
+  fulfilError,
+  onDispatch,
+  onDeliver,
+  onFailDelivery,
 }) {
   const addr = order.shippingAddress
   const itemCount = order.items.reduce((n, i) => n + i.quantity, 0)
@@ -473,6 +629,17 @@ function OrderDetail({
           </p>
         )}
       </div>
+
+      {/* Fulfilment — keyed by order id so the dispatch form resets. */}
+      <FulfilmentSection
+        key={order._id}
+        order={order}
+        busy={fulfilBusy}
+        error={fulfilError}
+        onDispatch={onDispatch}
+        onDeliver={onDeliver}
+        onFailDelivery={onFailDelivery}
+      />
     </div>
   )
 }
@@ -492,6 +659,8 @@ export default function AdminOrdersPage() {
   const [verifyError, setVerifyError] = useState('')
   const [billBusyId, setBillBusyId] = useState(null) // order generating a bill
   const [billError, setBillError] = useState('')
+  const [fulfilBusyId, setFulfilBusyId] = useState(null) // order being fulfilled
+  const [fulfilError, setFulfilError] = useState('')
 
   const sentinelRef = useRef(null)
   // reqId tags every fetch: when a filter/search changes mid-flight the id
@@ -612,11 +781,26 @@ export default function AdminOrdersPage() {
     }
   }
 
+  // A fulfilment action (dispatch / deliver / fail-delivery) — runs the
+  // given API call and folds the updated order back into the list.
+  const runFulfilAction = async (id, action) => {
+    setFulfilBusyId(id)
+    setFulfilError('')
+    try {
+      mergeOrder(await action())
+    } catch (err) {
+      setFulfilError(err.message || 'Could not update the order.')
+    } finally {
+      setFulfilBusyId(null)
+    }
+  }
+
   // Selecting an order marks it seen, and verifies it the first time.
   const handleSelect = (order) => {
     setSelectedId(order._id)
     setVerifyError('')
     setBillError('')
+    setFulfilError('')
     if (!order.seenByAdmin) {
       markOrderSeen(order._id).then(mergeOrder).catch(() => {})
     }
@@ -703,6 +887,23 @@ export default function AdminOrdersPage() {
                   billBusy={billBusyId === selected._id}
                   billError={billError}
                   onGenerateBill={() => runGenerateBill(selected._id)}
+                  fulfilBusy={fulfilBusyId === selected._id}
+                  fulfilError={fulfilError}
+                  onDispatch={(courier, trackingId) =>
+                    runFulfilAction(selected._id, () =>
+                      dispatchOrder(selected._id, courier, trackingId),
+                    )
+                  }
+                  onDeliver={() =>
+                    runFulfilAction(selected._id, () =>
+                      markDelivered(selected._id),
+                    )
+                  }
+                  onFailDelivery={() =>
+                    runFulfilAction(selected._id, () =>
+                      markDeliveryFailed(selected._id),
+                    )
+                  }
                 />
               ) : (
                 <div className="flex items-center justify-center py-20">

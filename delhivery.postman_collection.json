@@ -1,0 +1,59 @@
+{
+  "info": {
+    "name": "Delhivery — nuit (staging)",
+    "description": "Delhivery B2C API requests for the nuit integration. Built step by step as each API is tested against staging. Set the `token` (and `cl` if needed) collection variables before running. See DELHIVERY.md for the pipeline.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      { "key": "key", "value": "Authorization", "type": "string" },
+      { "key": "value", "value": "Token {{token}}", "type": "string" },
+      { "key": "in", "value": "header", "type": "string" }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://staging-express.delhivery.com",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "cl",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Fetch Waybill (single)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/waybill/api/bulk/json/?cl={{cl}}&count=1",
+          "host": ["{{baseUrl}}"],
+          "path": ["waybill", "api", "bulk", "json", ""],
+          "query": [
+            {
+              "key": "cl",
+              "value": "{{cl}}",
+              "description": "Client / HQ name from your Delhivery account — required; the API cannot derive it from the token."
+            },
+            {
+              "key": "count",
+              "value": "1",
+              "description": "Number of waybills to generate. 1 = a single waybill."
+            }
+          ]
+        },
+        "description": "Bulk Waybill API — generates fresh waybill (AWB) number(s). A waybill is just a reserved number; it only becomes trackable once it is used in Order Creation (manifestation). Requires the `cl` (client name) variable to be set."
+      }
+    }
+  ]
+}

@@ -1,11 +1,11 @@
-import nightwearImage from '../assets/categories/category-nightwear.png'
-import nightdressesImage from '../assets/categories/category-nightdresses.png'
-import brasImage from '../assets/categories/category-bras.png'
-import pantiesImage from '../assets/categories/category-panties.png'
+import nightwearImage from '../assets/categories/v5/category-nightwear.png';
+import nightdressesImage from '../assets/categories/v5/category-nightdresses.png';
+import brasImage from '../assets/categories/v5/category-bras.png';
+import pantiesImage from '../assets/categories/v5/category-panties.png';
 
 // Size sets differ by category — apparel runs XS–XL, kids runs numeric.
-const APPAREL_SIZES = ['XS', 'S', 'M', 'L', 'XL']
-const KIDS_SIZES = ['8', '10', '12', '14', '16']
+const APPAREL_SIZES = ['XS', 'S', 'M', 'L', 'XL'];
+const KIDS_SIZES = ['8', '10', '12', '14', '16'];
 
 /**
  * Site categories — the single source for the menu, the shop, the admin
@@ -62,8 +62,8 @@ export const categories = [
     blurb: 'Boys & girls',
     sizes: KIDS_SIZES,
   },
-]
+];
 
 /** The size set for a category id — falls back to apparel sizes. */
 export const sizesForCategory = (id) =>
-  categories.find((c) => c.id === id)?.sizes ?? APPAREL_SIZES
+  categories.find((c) => c.id === id)?.sizes ?? APPAREL_SIZES;

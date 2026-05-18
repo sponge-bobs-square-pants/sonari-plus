@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import Wordmark from '../brand/Wordmark'
+import { BRAND } from '../../data/brand'
 
 // Items are plain strings (placeholder `#` links) or { label, to }
 // objects for ones with a real page.
@@ -14,7 +16,7 @@ const COLUMNS = [
     ],
   },
   {
-    title: 'Sonari',
+    title: BRAND.name,
     items: [
       { label: 'Our story', to: '/about' },
       'Sustainability',
@@ -39,9 +41,7 @@ export default function Footer() {
         <div className="grid gap-10 md:grid-cols-[1.4fr_2fr]">
           {/* Brand */}
           <div>
-            <p className="font-display text-3xl font-light tracking-[0.3em] pl-[0.3em]">
-              SONARI
-            </p>
+            <Wordmark className="h-16 w-auto" />
             <p className="mt-5 max-w-xs text-sm leading-relaxed text-canvas/55">
               Modal and cotton sleepwear, night suits and intimates — made
               for how you actually sleep.
@@ -83,8 +83,8 @@ export default function Footer() {
         <div className="mt-6 flex flex-col gap-5 border-t border-canvas/12 pt-6 text-xs text-canvas/45 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
             <p>
-              © {new Date().getFullYear()} Sonari Nightwear. All rights
-              reserved.
+              © {new Date().getFullYear()} {BRAND.legalName} Nightwear. All
+              rights reserved.
             </p>
             <ul className="flex gap-5">
               {LEGAL.map((l) => (

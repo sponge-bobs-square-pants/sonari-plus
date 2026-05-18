@@ -6,6 +6,7 @@ import {
   updateProduct,
 } from '../../services/productApi'
 import { categories, sizesForCategory } from '../../data/categories'
+import { BRAND } from '../../data/brand'
 import TextField from '../../components/ui/TextField'
 import Button from '../../components/ui/Button'
 import AdminPageShell from '../../components/admin/AdminPageShell'
@@ -290,7 +291,7 @@ export default function AdminProductForm() {
             value={form.company}
             onChange={update}
             required
-            placeholder="e.g. Sonari, or a partner brand"
+            placeholder={`e.g. ${BRAND.name}, or a partner brand`}
             dark
           />
         </div>

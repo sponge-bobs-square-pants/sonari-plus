@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Reveal from '../ui/Reveal'
+import { BRAND } from '../../data/brand'
 
 /** Email capture — calm, centered, on the oat surface before the footer. */
 export default function Newsletter() {
@@ -36,7 +37,7 @@ export default function Newsletter() {
 
           {status === 'done' ? (
             <p className="mt-10 font-display text-lg font-light text-ink">
-              Thank you — welcome to Sonari. ♡
+              Thank you — welcome to {BRAND.name}. ♡
             </p>
           ) : (
             <form onSubmit={handleSubmit} className="mt-7">

@@ -56,7 +56,10 @@ export default function CategoryGallery() {
         </Link>
       </Reveal>
 
-      <div className="grid min-h-0 flex-1 gap-2.5 md:grid-cols-12 md:grid-rows-2">
+      {/* Explicit row heights — NOT flex-1 + `1fr` rows: Safari mis-sizes
+          `fr` grid rows (and the row-spanning Cordset tile) when the grid's
+          height is flex-derived, drifting the tiles out of alignment. */}
+      <div className="grid gap-2.5 md:grid-cols-12 md:grid-rows-[18rem_18rem]">
         {/* Only categories with a `span` are homepage gallery tiles. */}
         {categories
           .filter((cat) => cat.span)

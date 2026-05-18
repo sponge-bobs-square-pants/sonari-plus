@@ -1,9 +1,9 @@
 import PolicyLayout from '../components/layout/PolicyLayout'
+import { BRAND } from '../data/brand'
 
 const UPDATED = '17 May 2026'
 
-const INTRO =
-  'This Privacy Policy explains how Sonari Nightwear collects, uses and protects your personal information when you visit or shop with us. By using our website, you agree to the practices described here.'
+const INTRO = `This Privacy Policy explains how ${BRAND.legalName} Nightwear collects, uses and protects your personal information when you visit or shop with us. By using our website, you agree to the practices described here.`
 
 const SECTIONS = [
   {
@@ -112,7 +112,7 @@ const SECTIONS = [
         list: [
           'Email — chawla1310@gmail.com',
           'Phone — +91 94275 42349',
-          'Sonari Nightwear, Sneh Sudha Complex, opp. Sursagar Lake, Vadodara, Gujarat 390001',
+          `${BRAND.legalName} Nightwear, Sneh Sudha Complex, opp. Sursagar Lake, Vadodara, Gujarat 390001`,
         ],
       },
     ],

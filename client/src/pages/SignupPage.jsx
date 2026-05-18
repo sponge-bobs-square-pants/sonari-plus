@@ -11,6 +11,7 @@ import {
 import AuthLayout from '../components/auth/AuthLayout'
 import TextField from '../components/ui/TextField'
 import Button from '../components/ui/Button'
+import { BRAND } from '../data/brand'
 
 export default function SignupPage() {
   const dispatch = useDispatch()
@@ -38,7 +39,7 @@ export default function SignupPage() {
 
   return (
     <AuthLayout
-      intro="Join Sonari"
+      intro={`Join ${BRAND.name}`}
       title="Create your account"
       footer={
         <>
