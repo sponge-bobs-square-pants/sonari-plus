@@ -85,13 +85,15 @@ const orderSchema = new mongoose.Schema(
 
     // Fulfilment status, advanced from the admin panel:
     //   placed → accepted (Bill of Supply generated)
-    //          → dispatched (courier + tracking entered) → delivered.
+    //          → manifested (Delhivery shipment created — ready for pickup)
+    //          → dispatched (pickup scheduled) → delivered.
     // Plus cancelled / failed-delivery.
     status: {
       type: String,
       enum: [
         'placed',
         'accepted',
+        'manifested',
         'dispatched',
         'delivered',
         'cancelled',
@@ -115,13 +117,18 @@ const orderSchema = new mongoose.Schema(
     // The Bill of Supply — null until the admin generates it.
     billOfSupply: { type: billOfSupplySchema, default: null },
 
-    // Courier dispatch — set when the admin marks the order dispatched.
+    // Courier — Delhivery is the only shipping path; set when the parcel is
+    // manifested (it mints the waybill).
     courier: {
       type: String,
-      enum: ['', 'delhivery', 'bluedart', 'indiapost'],
+      enum: ['', 'delhivery'],
       default: '',
     },
     trackingId: { type: String, default: '' },
+
+    // Delhivery pickup-request id — set when a courier pickup is booked
+    // for this order's parcel at dispatch (null until then).
+    pickupId: { type: Number, default: null },
   },
   { timestamps: true },
 )

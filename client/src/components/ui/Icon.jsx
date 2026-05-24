@@ -58,6 +58,14 @@ const PATHS = {
       <path d="M8.5 16h4" />
     </>
   ),
+  truck: (
+    <>
+      <path d="M2.5 6.5h11v10h-11z" />
+      <path d="M13.5 9.5h3.7l3.3 3.3v3.7h-7z" />
+      <circle cx="6.5" cy="18.5" r="1.7" />
+      <circle cx="17" cy="18.5" r="1.7" />
+    </>
+  ),
 }
 
 export default function Icon({ name, className = 'h-[26px] w-[26px]' }) {

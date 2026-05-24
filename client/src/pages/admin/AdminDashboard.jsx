@@ -14,6 +14,12 @@ const OPTIONS = [
     body: 'Every order placed in the store — payment status, customer and fulfilment at a glance.',
   },
   {
+    to: '/admin/pickups',
+    icon: 'truck',
+    title: 'Pickups',
+    body: 'Manifested orders waiting for a courier — book one pickup to collect them all.',
+  },
+  {
     to: '/admin/bills',
     icon: 'doc',
     title: 'Bills',

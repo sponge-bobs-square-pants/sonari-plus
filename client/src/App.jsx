@@ -19,6 +19,7 @@ import AccountPage from './pages/AccountPage'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminProductsPage from './pages/admin/AdminProductsPage'
 import AdminOrdersPage from './pages/admin/AdminOrdersPage'
+import AdminPickupsPage from './pages/admin/AdminPickupsPage'
 import AdminBillsPage from './pages/admin/AdminBillsPage'
 import AdminProductForm from './pages/admin/AdminProductForm'
 import AdminLandingConfig from './pages/admin/AdminLandingConfig'
@@ -79,6 +80,7 @@ function App() {
         <Route element={<RequireAdmin><Outlet /></RequireAdmin>}>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/orders" element={<AdminOrdersPage />} />
+          <Route path="/admin/pickups" element={<AdminPickupsPage />} />
           <Route path="/admin/bills" element={<AdminBillsPage />} />
           <Route path="/admin/products" element={<AdminProductsPage />} />
           <Route path="/admin/products/new" element={<AdminProductForm />} />

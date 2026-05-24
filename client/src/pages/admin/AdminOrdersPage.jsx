@@ -4,7 +4,8 @@ import {
   markOrderSeen,
   verifyOrder,
   generateBill,
-  dispatchOrder,
+  manifestOrder,
+  getOrderLabel,
   markDelivered,
   markDeliveryFailed,
 } from '../../services/orderApi'
@@ -29,6 +30,7 @@ const PAYMENT_LABEL = { created: 'Pending', paid: 'Paid', failed: 'Failed' }
 const STATUS_LABEL = {
   placed: 'Placed',
   accepted: 'Accepted',
+  manifested: 'Ready for pickup',
   dispatched: 'Dispatched',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
@@ -188,6 +190,7 @@ function FilterBar({ filters, onChange, search, onSearchChange }) {
           ['', 'All'],
           ['placed', 'Placed'],
           ['accepted', 'Accepted'],
+          ['manifested', 'Ready for pickup'],
           ['dispatched', 'Dispatched'],
           ['delivered', 'Delivered'],
           ['failed-delivery', 'Failed delivery'],
@@ -301,36 +304,45 @@ function VerifyPanel({ order, verifying, error, onRecheck }) {
   )
 }
 
-/* ── Fulfilment — courier dispatch + delivery outcome ── */
-const COURIER_OPTIONS = [
-  ['delhivery', 'Delhivery'],
-  ['bluedart', 'BlueDart'],
-  ['indiapost', 'India Post'],
-]
-const COURIER_LABEL = Object.fromEntries(COURIER_OPTIONS)
-
+/* ── Fulfilment — Delhivery shipping + delivery outcome ── */
 /**
  * The fulfilment block — shows the control that fits the order's current
- * status: a dispatch form when `accepted`, deliver / failed-delivery
- * buttons when `dispatched`, a read-only outcome thereafter. Keyed by
- * order id so the dispatch form's inputs reset between orders.
+ * status: the "Ship with Delhivery" form when `accepted`, a ready-for-pickup
+ * note when `manifested`, deliver / failed-delivery buttons when
+ * `dispatched`, a read-only outcome thereafter. Keyed by order id so the
+ * manifest form's inputs reset between orders.
  */
 function FulfilmentSection({
   order,
   busy,
   error,
-  onDispatch,
+  onManifest,
+  onLabel,
   onDeliver,
   onFailDelivery,
 }) {
-  const [courier, setCourier] = useState('')
-  const [trackingId, setTrackingId] = useState('')
+  // Physical package details Delhivery can't infer (for the manifest).
+  const [weight, setWeight] = useState('')
+  const [dims, setDims] = useState({ l: '', w: '', h: '' })
 
   const shipment = order.courier && (
     <p className="mt-2 text-sm text-canvas/80">
-      {COURIER_LABEL[order.courier] || order.courier} ·{' '}
+      Delhivery ·{' '}
       <span className="text-canvas">{order.trackingId}</span>
+      {order.pickupId ? (
+        <span className="text-canvas/45"> · pickup #{order.pickupId}</span>
+      ) : null}
     </p>
+  )
+
+  const labelButton = order.trackingId && (
+    <button
+      type="button"
+      onClick={onLabel}
+      className="eyebrow cursor-pointer rounded-full border border-canvas/30 px-5 py-2.5 text-canvas/70 transition-colors hover:border-canvas hover:text-canvas"
+    >
+      Print label
+    </button>
   )
 
   return (
@@ -346,47 +358,72 @@ function FulfilmentSection({
 
       {order.status === 'accepted' && (
         <div className="mt-3">
-          <div className="flex flex-wrap items-end gap-5">
-            <label className="flex flex-col gap-1.5">
-              <span className="eyebrow text-canvas/40">Courier</span>
-              <select
-                value={courier}
-                onChange={(e) => setCourier(e.target.value)}
-                style={{ colorScheme: 'dark' }}
-                className="cursor-pointer border-b border-canvas/25 bg-transparent py-1 text-sm text-canvas transition-colors focus:border-canvas/60 focus:outline-none"
+          {/* Delhivery: manifest the parcel, then schedule pickup via the API */}
+          <div>
+            <p className="eyebrow mb-3 text-canvas/55">Ship with Delhivery</p>
+            <div className="flex flex-wrap items-end gap-x-5 gap-y-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="eyebrow text-canvas/40">Weight (g)</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  placeholder="400"
+                  className="w-24 border-b border-canvas/25 bg-transparent py-1 text-sm text-canvas placeholder:text-canvas/35 transition-colors focus:border-canvas/60 focus:outline-none"
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="eyebrow text-canvas/40">L × W × H (cm)</span>
+                <div className="flex items-center gap-1.5">
+                  {['l', 'w', 'h'].map((k) => (
+                    <span key={k} className="flex items-center gap-1.5">
+                      {k !== 'l' && <span className="text-canvas/30">×</span>}
+                      <input
+                        type="number"
+                        min="1"
+                        value={dims[k]}
+                        onChange={(e) =>
+                          setDims((d) => ({ ...d, [k]: e.target.value }))
+                        }
+                        placeholder={k.toUpperCase()}
+                        className="w-12 border-b border-canvas/25 bg-transparent py-1 text-center text-sm text-canvas placeholder:text-canvas/35 transition-colors focus:border-canvas/60 focus:outline-none"
+                      />
+                    </span>
+                  ))}
+                </div>
+              </label>
+              <button
+                type="button"
+                onClick={() =>
+                  onManifest({
+                    weight,
+                    length: dims.l,
+                    width: dims.w,
+                    height: dims.h,
+                  })
+                }
+                disabled={busy || !weight}
+                className="eyebrow cursor-pointer rounded-full border border-canvas px-5 py-2.5 text-canvas transition-colors hover:bg-canvas hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <option value="" className="bg-ink text-canvas">
-                  Select courier
-                </option>
-                {COURIER_OPTIONS.map(([v, l]) => (
-                  <option key={v} value={v} className="bg-ink text-canvas">
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="eyebrow text-canvas/40">Tracking ID</span>
-              <input
-                type="text"
-                value={trackingId}
-                onChange={(e) => setTrackingId(e.target.value)}
-                placeholder="Courier AWB number"
-                className="w-52 border-b border-canvas/25 bg-transparent py-1 text-sm text-canvas placeholder:text-canvas/35 transition-colors focus:border-canvas/60 focus:outline-none"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => onDispatch(courier, trackingId.trim())}
-              disabled={busy || !courier || !trackingId.trim()}
-              className="eyebrow cursor-pointer rounded-full border border-canvas px-5 py-2.5 text-canvas transition-colors hover:bg-canvas hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {busy ? 'Saving…' : 'Mark dispatched'}
-            </button>
+                {busy ? 'Creating…' : 'Mark ready for pickup'}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-canvas/40">
+              Creates the waybill + label. Schedule the courier pickup later
+              from the Pickups panel.
+            </p>
           </div>
-          <p className="mt-2 text-xs text-canvas/40">
-            Enter the courier and tracking ID from the booked shipment.
+        </div>
+      )}
+
+      {order.status === 'manifested' && (
+        <div className="mt-2.5">
+          {shipment}
+          <p className="mt-2 text-xs text-canvas/45">
+            Ready for pickup — schedule the courier in the Pickups panel.
           </p>
+          {labelButton && <div className="mt-4">{labelButton}</div>}
         </div>
       )}
 
@@ -410,6 +447,7 @@ function FulfilmentSection({
             >
               Failed delivery
             </button>
+            {labelButton}
           </div>
         </div>
       )}
@@ -426,6 +464,7 @@ function FulfilmentSection({
               </span>
             )}
           </p>
+          {labelButton && <div className="mt-4">{labelButton}</div>}
         </div>
       )}
 
@@ -435,6 +474,7 @@ function FulfilmentSection({
           <p className="mt-3 text-sm text-dusk">
             Delivery failed — the courier could not deliver this parcel.
           </p>
+          {labelButton && <div className="mt-4">{labelButton}</div>}
         </div>
       )}
 
@@ -458,7 +498,8 @@ function OrderDetail({
   onGenerateBill,
   fulfilBusy,
   fulfilError,
-  onDispatch,
+  onManifest,
+  onLabel,
   onDeliver,
   onFailDelivery,
 }) {
@@ -630,13 +671,14 @@ function OrderDetail({
         )}
       </div>
 
-      {/* Fulfilment — keyed by order id so the dispatch form resets. */}
+      {/* Fulfilment — keyed by order id so the manifest form resets. */}
       <FulfilmentSection
         key={order._id}
         order={order}
         busy={fulfilBusy}
         error={fulfilError}
-        onDispatch={onDispatch}
+        onManifest={onManifest}
+        onLabel={onLabel}
         onDeliver={onDeliver}
         onFailDelivery={onFailDelivery}
       />
@@ -795,6 +837,25 @@ export default function AdminOrdersPage() {
     }
   }
 
+  // Manifest with Delhivery (create shipment → 'manifested', ready for pickup).
+  const runManifest = (id, pkg) =>
+    runFulfilAction(id, () => manifestOrder(id, pkg))
+
+  // Fetch + open the shipping label. The tab is opened synchronously on the
+  // click so the browser doesn't block the post-fetch navigation as a popup.
+  const runLabel = (id) => {
+    const win = window.open('', '_blank')
+    setFulfilError('')
+    getOrderLabel(id)
+      .then((url) => {
+        if (win) win.location = url
+      })
+      .catch((err) => {
+        if (win) win.close()
+        setFulfilError(err.message || 'Could not fetch the label.')
+      })
+  }
+
   // Selecting an order marks it seen, and verifies it the first time.
   const handleSelect = (order) => {
     setSelectedId(order._id)
@@ -889,11 +950,8 @@ export default function AdminOrdersPage() {
                   onGenerateBill={() => runGenerateBill(selected._id)}
                   fulfilBusy={fulfilBusyId === selected._id}
                   fulfilError={fulfilError}
-                  onDispatch={(courier, trackingId) =>
-                    runFulfilAction(selected._id, () =>
-                      dispatchOrder(selected._id, courier, trackingId),
-                    )
-                  }
+                  onManifest={(pkg) => runManifest(selected._id, pkg)}
+                  onLabel={() => runLabel(selected._id)}
                   onDeliver={() =>
                     runFulfilAction(selected._id, () =>
                       markDelivered(selected._id),

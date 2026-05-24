@@ -57,15 +57,6 @@ export const verifyOrder = (id) =>
 export const generateBill = (id) =>
   api.post(`/orders/admin/${id}/bill`).then((d) => d.order)
 
-/**
- * Admin: dispatch an order — records the courier + tracking ID and
- * advances `accepted → dispatched`. Resolves to the updated order.
- */
-export const dispatchOrder = (id, courier, trackingId) =>
-  api
-    .post(`/orders/admin/${id}/dispatch`, { courier, trackingId })
-    .then((d) => d.order)
-
 /** Admin: mark a dispatched order delivered (stamps the return deadline). */
 export const markDelivered = (id) =>
   api.post(`/orders/admin/${id}/deliver`).then((d) => d.order)
@@ -73,6 +64,29 @@ export const markDelivered = (id) =>
 /** Admin: mark a dispatched order's delivery as failed. */
 export const markDeliveryFailed = (id) =>
   api.post(`/orders/admin/${id}/fail-delivery`).then((d) => d.order)
+
+/**
+ * Admin: manifest an order with Delhivery — creates the shipment + waybill
+ * and moves it to 'manifested' (ready for pickup). `pkg` = { weight, length,
+ * width, height }. Resolves to the updated order.
+ */
+export const manifestOrder = (id, pkg) =>
+  api.post(`/orders/admin/${id}/manifest`, pkg).then((d) => d.order)
+
+/** Admin: the orders ready for pickup (status 'manifested'), newest first. */
+export const listManifested = () =>
+  api.get('/orders/admin/manifested').then((d) => d.orders)
+
+/**
+ * Admin: schedule ONE Delhivery pickup that collects all the given
+ * manifested orders. Resolves to `{ pickup, count }`.
+ */
+export const createBatchPickup = (orderIds, pickupDate, pickupTime) =>
+  api.post('/orders/admin/pickup', { orderIds, pickupDate, pickupTime })
+
+/** Admin: fetch the Delhivery shipping-label (packing slip) PDF URL. */
+export const getOrderLabel = (id) =>
+  api.get(`/orders/admin/${id}/label`).then((d) => d.url)
 
 /**
  * Admin: the Bill-of-Supply register — orders with a bill, within an

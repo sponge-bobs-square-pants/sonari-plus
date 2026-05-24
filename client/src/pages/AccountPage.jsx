@@ -48,6 +48,7 @@ function formatOrderDate(iso) {
 const STATUS_LABEL = {
   placed: 'Placed',
   accepted: 'Accepted',
+  manifested: 'Preparing to ship',
   dispatched: 'Dispatched',
   delivered: 'Delivered',
   cancelled: 'Cancelled',

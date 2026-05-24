@@ -11,6 +11,11 @@ import {
   RAZORPAY_WEBHOOK_SECRET,
 } from '../config/razorpay.js'
 import { financialYear, buildBillOfSupplyPdf } from '../utils/billOfSupply.js'
+import {
+  createShipment,
+  schedulePickup,
+  getPackingSlip,
+} from '../services/delhivery.js'
 
 // Must mirror client/src/data/shipping.js — the server is the source of
 // truth for money, so the client's totals are never trusted.
@@ -434,51 +439,6 @@ export async function generateBillOfSupply(req, res, next) {
 // receipt). Keep in step with the policy pages.
 const RETURN_WINDOW_DAYS = 10
 const DAY_MS = 24 * 60 * 60 * 1000
-// Couriers the admin may dispatch with — mirrors the Order model's enum.
-const COURIERS = ['delhivery', 'bluedart', 'indiapost']
-
-/**
- * POST /api/orders/admin/:id/dispatch — record the courier + tracking ID
- * and advance `accepted → dispatched`. Body: `{ courier, trackingId }`.
- */
-export async function dispatchOrder(req, res, next) {
-  try {
-    const order = await Order.findById(req.params.id).populate(
-      'user',
-      'name email',
-    )
-    if (!order) return res.status(404).json({ message: 'Order not found.' })
-
-    // Fulfil only on a genuinely paid order, never on `status` alone.
-    if (order.paymentStatus !== 'paid') {
-      return res
-        .status(400)
-        .json({ message: 'Only a paid order can be dispatched.' })
-    }
-    if (order.status !== 'accepted') {
-      return res.status(400).json({
-        message: 'Only an accepted order can be dispatched.',
-      })
-    }
-
-    const courier = String(req.body.courier || '').trim()
-    const trackingId = String(req.body.trackingId || '').trim()
-    if (!COURIERS.includes(courier)) {
-      return res.status(400).json({ message: 'Choose a valid courier.' })
-    }
-    if (!trackingId) {
-      return res.status(400).json({ message: 'A tracking ID is required.' })
-    }
-
-    order.courier = courier
-    order.trackingId = trackingId
-    order.status = 'dispatched'
-    await order.save()
-    res.json({ order })
-  } catch (err) {
-    next(err)
-  }
-}
 
 /**
  * POST /api/orders/admin/:id/deliver — advance `dispatched → delivered` and
@@ -528,6 +488,142 @@ export async function markDeliveryFailed(req, res, next) {
     res.json({ order })
   } catch (err) {
     next(err)
+  }
+}
+
+/**
+ * POST /api/orders/admin/:id/manifest — manifest the order with Delhivery
+ * (Order Creation). Body: { weight, length, width, height } (weight g, dims cm).
+ * Creates the shipment + waybill and advances `accepted → manifested`
+ * ("ready for pickup"). The pickup itself is booked separately, in a batch,
+ * via the Pickups panel (createBatchPickup).
+ */
+export async function manifestOrder(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id).populate(
+      'user',
+      'name email',
+    )
+    if (!order) return res.status(404).json({ message: 'Order not found.' })
+    if (order.paymentStatus !== 'paid') {
+      return res
+        .status(400)
+        .json({ message: 'Only a paid order can be manifested.' })
+    }
+    if (order.status !== 'accepted') {
+      return res
+        .status(400)
+        .json({ message: 'Only an accepted order can be manifested.' })
+    }
+
+    const { weight, length, width, height } = req.body
+    if (!weight || Number(weight) <= 0) {
+      return res
+        .status(400)
+        .json({ message: 'Package weight (in grams) is required.' })
+    }
+
+    const shipment = await createShipment(order, { weight, length, width, height })
+    order.courier = 'delhivery'
+    order.trackingId = shipment.waybill
+    order.status = 'manifested'
+    await order.save()
+    res.json({ order })
+  } catch (err) {
+    // A manifest (createShipment) failure lands here — nothing was saved.
+    console.error('[delhivery] manifest failed:', err.message)
+    res
+      .status(502)
+      .json({ message: err.message || 'Delhivery manifest failed.' })
+  }
+}
+
+/**
+ * GET /api/orders/admin/manifested — orders that are manifested and awaiting
+ * pickup (status 'manifested'), newest first. Backs the Pickups panel.
+ */
+export async function listManifested(req, res, next) {
+  try {
+    const orders = await Order.find({ status: 'manifested' })
+      .sort({ createdAt: -1 })
+      .populate('user', 'name email')
+    res.json({ orders })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * POST /api/orders/admin/pickup — schedule ONE Delhivery pickup that
+ * collects every selected manifested order. Body:
+ *   { orderIds: [...], pickupDate, pickupTime }
+ * Books a single pickup (count = number of orders) and moves each order
+ * `manifested → dispatched`, tagging it with the returned pickup id.
+ */
+export async function createBatchPickup(req, res, next) {
+  try {
+    const { orderIds, pickupDate, pickupTime } = req.body
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      return res
+        .status(400)
+        .json({ message: 'Select at least one order for the pickup.' })
+    }
+    if (!pickupDate || !pickupTime) {
+      return res
+        .status(400)
+        .json({ message: 'A pickup date and time are required.' })
+    }
+
+    // Only orders still 'manifested' can join a pickup.
+    const orders = await Order.find({
+      _id: { $in: orderIds },
+      status: 'manifested',
+    })
+    if (orders.length === 0) {
+      return res
+        .status(400)
+        .json({ message: 'None of the selected orders are ready for pickup.' })
+    }
+
+    const pickup = await schedulePickup({
+      date: pickupDate,
+      time: pickupTime,
+      count: orders.length,
+    })
+    await Order.updateMany(
+      { _id: { $in: orders.map((o) => o._id) } },
+      { $set: { status: 'dispatched', pickupId: pickup.pickupId } },
+    )
+    res.json({ pickup, count: orders.length })
+  } catch (err) {
+    // schedulePickup failure lands here — no order was changed.
+    console.error('[delhivery] pickup failed:', err.message)
+    res
+      .status(502)
+      .json({ message: err.message || 'Delhivery pickup failed.' })
+  }
+}
+
+/**
+ * GET /api/orders/admin/:id/label — fetch the Delhivery shipping-label PDF
+ * (Packing Slip) for a Delhivery shipment; returns a ~24h download URL.
+ */
+export async function getOrderLabel(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id)
+    if (!order) return res.status(404).json({ message: 'Order not found.' })
+    if (order.courier !== 'delhivery' || !order.trackingId) {
+      return res
+        .status(400)
+        .json({ message: 'No Delhivery shipment for this order yet.' })
+    }
+    const url = await getPackingSlip(order.trackingId)
+    res.json({ url })
+  } catch (err) {
+    console.error('[delhivery] label fetch failed:', err.message)
+    res
+      .status(502)
+      .json({ message: err.message || 'Could not fetch the label.' })
   }
 }
 

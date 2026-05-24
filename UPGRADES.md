@@ -24,18 +24,22 @@ from orders stuck at `paymentStatus: 'created'` past a timeout, and on the
 ### Admin order management [P1]
 **Done:** the `/admin/orders` list + two-column master/detail, filters,
 New/seen tracking, the per-order Razorpay verification check, Bill of
-Supply generation (`→ accepted`), and the **order fulfilment controls** —
-admin dispatch (courier + tracking ID, `accepted → dispatched`), `→
-delivered` (stamps `returnDeadline`), and `→ failed-delivery`. All guard
+Supply generation (`→ accepted`), the **order fulfilment controls** (`→
+delivered` stamps `returnDeadline`, `→ failed-delivery`), and the
+**Delhivery shipping pipeline** (the only shipping path — no manual-courier
+fallback) — a two-step ship: *manifest* a parcel (`accepted → manifested`, creates the
+Delhivery shipment + waybill), then book a batch pickup from the **Pickups
+panel** (`/admin/pickups`, `manifested → dispatched`, one pickup collects
+all selected parcels). Packing-slip labels print per order. Delhivery APIs
+verified end-to-end — see `DELHIVERY.md`. All actions guard
 `paymentStatus === 'paid'` and the required current status.
 
 **Next — customer order-tracking UI** (the active piece of work): the
 account "Track" button (today a placeholder) goes live once an order has
 `courier` + `trackingId`. **Decided — the proxied approach:** our backend
-calls each courier's tracking API (Delhivery / BlueDart / India Post) and
-we render the status timeline in-app. The order's `courier` field tells the
-backend which API to call. Needs a tracking-API account/credentials with
-each courier — set up when this is built.
+calls the courier's tracking API (Delhivery's `getTracking`, already
+verified) and we render the status timeline in-app. The order's `courier`
+field tells the backend which API to call (only Delhivery wired so far).
 
 ### Refund processing [P2]
 The Refund & Cancellation *policy* exists; actually *issuing* refunds does not.

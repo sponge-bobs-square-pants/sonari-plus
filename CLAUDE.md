@@ -212,14 +212,16 @@ a listener middleware (`features/cart/cartListener.js`, prepended in
 - **Order model** (`server/src/models/Order.js`) — item snapshots, shipping
   address, server-computed `subtotal`/`deliveryFee`/`total`, `razorpayOrderId`,
   `paymentStatus` (`created`→`paid`/`failed`), `status` (`placed → accepted →
-  dispatched → delivered`, plus `cancelled` / `failed-delivery`), and
-  `returnDeadline` — the last day a return may be requested; stamped when the
+  manifested → dispatched → delivered`, plus `cancelled` / `failed-delivery`),
+  and `returnDeadline` — the last day a return may be requested; stamped when the
   order is marked **delivered** (delivery date + the 10-day return window),
   null until then. Also `seenByAdmin` (drives the admin "New" badge),
   `verification`
   (`{ status, checkedAt }` — the admin's stored Razorpay re-check result),
-  `billOfSupply` (`{ number, url, issuedAt }` — null until generated), and
-  `courier`/`trackingId` (set at dispatch).
+  `billOfSupply` (`{ number, url, issuedAt }` — null until generated),
+  `courier`/`trackingId` (set when shipped — `trackingId` is the Delhivery
+  waybill), and `pickupId` (the Delhivery pickup-request id, set when a batch
+  pickup is booked).
 - Flow: `POST /api/orders/create` builds a pending Order + a Razorpay order
   (totals computed server-side from the DB cart — client totals never trusted)
   → client opens Razorpay → `POST /api/orders/verify` checks the HMAC
@@ -265,14 +267,35 @@ a listener middleware (`features/cart/cartListener.js`, prepended in
   `GET /api/orders/admin/bills`) is the GST register: every Bill of Supply,
   filterable by issued-date range (3 year presets + custom), with count +
   turnover + 1% composition GST aggregated server-side over the whole range.
-- **Order fulfilment** (admin). Three admin actions advance a paid order's
-  `status`: `POST /admin/:id/dispatch` (body `{ courier, trackingId }` →
-  `accepted → dispatched`), `POST /admin/:id/deliver` (`→ delivered`, stamps
-  `returnDeadline` = now + 10 days), `POST /admin/:id/fail-delivery` (`→
-  failed-delivery`). Each guards `paymentStatus === 'paid'` and the required
-  current status. The controls live in the `AdminOrdersPage` order detail
-  (`FulfilmentSection`) — a courier picker + tracking-ID field when
-  `accepted`, deliver / failed-delivery buttons when `dispatched`.
+- **Order fulfilment** (admin) — Delhivery is the ONLY shipping path (built
+  end-to-end; no manual-courier fallback). The lifecycle past `accepted` is a
+  **two-step ship**: first *manifest* the parcel (create the Delhivery
+  shipment → a waybill), then *book a pickup* that collects all manifested
+  parcels at once. Endpoints (each guards `paymentStatus === 'paid'` + the
+  required current status):
+  - `POST /admin/:id/manifest` (body `{ weight, dimensions }`) — `accepted →
+    manifested`. Calls `createShipment` (`services/delhivery.js`), stores
+    `courier:'delhivery'` + `trackingId` (waybill). 502 on a Delhivery failure
+    (status stays `accepted`). See `DELHIVERY.md`.
+  - `GET /admin/manifested` — all `manifested` orders (backs the Pickups panel).
+  - `POST /admin/pickup` (body `{ orderIds, pickupDate, pickupTime }`) — books
+    ONE Delhivery pickup for `count = orderIds.length` parcels via
+    `schedulePickup`, then `updateMany` those orders `manifested → dispatched`
+    and stamps `pickupId`.
+  - `GET /admin/:id/label` — the Delhivery packing-slip PDF link
+    (`getPackingSlip`). The slip's layout is Delhivery's own (any text/barcode
+    overlap is their template, not ours — we just open their PDF link).
+  - `POST /admin/:id/deliver` (`→ delivered`, stamps `returnDeadline` = now +
+    10 days) · `POST /admin/:id/fail-delivery` (`→ failed-delivery`).
+
+  UI: the `AdminOrdersPage` order detail (`FulfilmentSection`) shows a "Ship
+  with Delhivery" form (weight + L×W×H → manifest) when `accepted`; a "Ready
+  for pickup — schedule in Pickups panel" note when `manifested`; deliver /
+  failed-delivery when `dispatched`. A "Print label" button appears once a
+  waybill exists. The batch pickup itself lives on a separate page —
+  **`/admin/pickups`** (`AdminPickupsPage`, its own dashboard tile): a
+  checklist of manifested orders + a date/time picker → one "Schedule pickup".
+  Customer-facing, `manifested` reads as **"Preparing to ship"**.
 - **Saved addresses** — `User.addresses[]` (each with its own `_id`).
   Checkout shows a scrollable picker of saved addresses *or* a new-address
   form with a "Save this address" checkbox; ticking it makes `createOrder`
@@ -303,12 +326,14 @@ so nothing is rebuilt or missed.
 Nearest-term:
 - **Admin order management** — IN PROGRESS. Done: the Orders list +
   two-column detail, filters, New/seen tracking, the Razorpay verify check,
-  Bill of Supply generation (→ `accepted`), and the **order fulfilment
-  controls** — admin dispatch / delivered / failed-delivery. **Next: the
-  customer-facing order-tracking UI** — decided: proxied courier tracking,
-  where our backend calls the Delhivery / BlueDart / India Post tracking
-  APIs (the order's `courier` field selects which) and we render the
-  timeline in-app. The Delhivery integration is specced in **`DELHIVERY.md`**
-  (project root). See `UPGRADES.md` → Admin order management. Refund
-  processing follows.
+  Bill of Supply generation (→ `accepted`), the **order fulfilment controls**
+  (deliver / failed-delivery + manual-courier fallback), and the **Delhivery
+  shipping pipeline** — manifest a parcel (→ waybill), the Pickups panel
+  (`/admin/pickups`) for batch pickup booking, and packing-slip labels. All
+  Delhivery API work is verified end-to-end and specced in **`DELHIVERY.md`**
+  (project root). **Next: the customer-facing order-tracking UI** — decided:
+  proxied courier tracking, where our backend calls the Delhivery tracking API
+  (the verified `getTracking` path) and we render the timeline in-app; the
+  account "Track" button is still a placeholder. See `UPGRADES.md` → Admin
+  order management. Refund processing follows.
 - The admin "Configure landing page" tool (`/admin/landing` is a stub).

@@ -1,12 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { useDispatch } from 'react-redux'
-import { logout } from '../../features/auth/authSlice'
+import { Link } from 'react-router-dom'
 import Wordmark from '../brand/Wordmark'
 
 /**
  * Shared chrome for every admin page — a top bar with a back link
- * (left) and a Sign out control + the SONARI wordmark (right), then a
- * centered content container.
+ * (left) and the nuit wordmark (right), then a centered content container.
+ * (Sign out lives on the dashboard, not here.)
  *
  * `dark` flips the whole page to the ink theme and drops the header
  * border — used only by the dashboard.
@@ -28,14 +26,6 @@ export default function AdminPageShell({
   fit = false,
   children,
 }) {
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
-
-  const handleSignOut = async () => {
-    await dispatch(logout())
-    navigate('/')
-  }
-
   return (
     <div
       className={`${
@@ -47,7 +37,7 @@ export default function AdminPageShell({
       } ${dark ? 'bg-ink text-canvas' : 'bg-canvas'}`}
     >
       <header
-        className={`flex shrink-0 items-center justify-between px-6 py-6 sm:px-10 ${
+        className={`flex shrink-0 items-center justify-between px-6 py-4 sm:px-10 ${
           dark ? '' : 'border-b border-linen'
         }`}
       >
@@ -64,25 +54,12 @@ export default function AdminPageShell({
           </span>
           {backLabel}
         </Link>
-        <div className="flex items-center gap-6">
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className={`eyebrow cursor-pointer transition-colors ${
-              dark
-                ? 'text-canvas/55 hover:text-canvas'
-                : 'text-clay hover:text-ink'
-            }`}
-          >
-            Sign out
-          </button>
-          <Link
-            to="/"
-            className={`flex items-center ${dark ? 'text-canvas' : 'text-ink'}`}
-          >
-            <Wordmark className="h-12 w-auto" label="nuit — home" />
-          </Link>
-        </div>
+        <Link
+          to="/"
+          className={`flex items-center ${dark ? 'text-canvas' : 'text-ink'}`}
+        >
+          <Wordmark className="h-12 w-auto" label="nuit — home" />
+        </Link>
       </header>
 
       <div
@@ -90,7 +67,7 @@ export default function AdminPageShell({
           fit ? 'min-h-0 flex-1 overflow-y-auto scrollbar-hide' : ''
         } ${
           full
-            ? 'max-w-none pt-9 pb-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col'
+            ? 'max-w-none pt-1 pb-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col'
             : `py-14 ${wide ? 'max-w-7xl' : 'max-w-4xl'}`
         }`}
       >

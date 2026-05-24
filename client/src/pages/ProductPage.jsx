@@ -284,7 +284,7 @@ export default function ProductPage() {
                   {hint && <p className="mt-3 text-xs text-dusk">{hint}</p>}
                   {added && (
                     <Link
-                      to="/account"
+                      to="/cart"
                       className="eyebrow mt-3 inline-block text-clay transition-colors hover:text-ink"
                     >
                       View bag →

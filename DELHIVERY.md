@@ -20,17 +20,24 @@ changes:
 | Staging / testing | `https://staging-express.delhivery.com`  |
 | Production        | `https://track.delhivery.com`            |
 
-**Exception:** the **tracking API** (§3.7) is always served from
-`track.delhivery.com`, even for staging — the `staging-express` host `401`s
-on it (its tracking path is gated behind the web-portal session).
+The **tracking API** (§3.7) uses this **same base URL** — it works on
+`staging-express` in dev with the token. (It `401`'d in earlier tests only
+because of an old, wrong token.)
 
-**Token.** A unique 12–16 char API token per account. Delhivery issues a
-**sandbox token** for testing, then a **production token** after UAT —
-confirm which one you hold. Stored in `server/.env` as `DELHIVERY_API_TOKEN`.
-Planned config `server/src/config/delhivery.js` picks the base URL by
-`NODE_ENV`, mirroring `server/src/config/razorpay.js`.
+**Token.** Delhivery issues a **sandbox/test token** and (after UAT) a
+**production token** — separate credentials. `server/.env` holds:
+- `DELHIVERY_DEV_API_KEY` — staging/test token. ✓ Verified working across
+  **waybill, order creation, warehouse AND pickup** on one account.
+- `DELHIVERY_PROD_API_KEY` — production token (add at go-live).
+- `DELHIVERY_CLIENT_ID` — the account's client name for the `cl` param.
+  Staging test account = `KRISHNASURFACE-B2C`.
 
-**Auth header** on every request: `Authorization: Token <DELHIVERY_API_TOKEN>`
+Planned config `server/src/config/delhivery.js` picks the token + base URL
+by `NODE_ENV`, mirroring `server/src/config/razorpay.js`. (An earlier
+`{"detail":"Invalid token"}` on pickup was an *old, wrong* key — the proper
+dev token works for all these services; pickup does NOT need its own token.)
+
+**Auth header** on every request: `Authorization: Token <token>`
 
 ---
 
@@ -143,27 +150,40 @@ Request (verified format):
 `GET` the Packing Slip API → label data (all shipment details for the
 printed label). Owner-side; not used by nuit.
 
-### 3.6 Pickup Request
-`POST /fm/request/new/` — fields: `pickup_time`, `pickup_date`,
-`pickup_location` (warehouse name), `expected_package_count`. Returns a
-`pickup_id`. One warehouse can't queue a second pickup until the first
-completes; different warehouses are independent. Can also be done in the
-portal.
+### 3.6 Pickup Request ✓ verified on staging
+`POST /fm/request/new/` — JSON body (`Content-Type: application/json`):
+- `pickup_time` — `HH:MM:SS`
+- `pickup_date` — `YYYY-MM-DD`; must be **today or future** (a past date →
+  `400 {"pickup_date":"Pickup date cannot be in past"}`)
+- `pickup_location` — the warehouse **name**; must match a registered
+  warehouse on this account (else `400 "Invalid Pickup Location…"`)
+- `expected_package_count` — integer
 
-### 3.7 Order Tracking — **this is what nuit builds**
-`GET https://track.delhivery.com/api/v1/packages/json/?waybill=<AWB>&ref_ids=<orderRef>`
+**Response** (HTTP 201) — store `pickup_id` to reference the pickup:
+```json
+{
+  "pickup_id": 125822,
+  "client_name": "KRISHNASURFACE-B2C",
+  "pickup_location_name": "SONARI NIGHT WEAR",
+  "incoming_center_name": "Vadodara_Karelibaug_DC",
+  "pickup_time": "14:00:00",
+  "pickup_date": "2026-05-26",
+  "expected_package_count": 1
+}
+```
+A pickup is **per-warehouse**, not per-order (one pickup sweeps all that
+warehouse's manifested parcels).
 
-> ✓ **Verified.** Auth = the `Authorization: Token <token>` header → HTTP
-> 200. The tracking API is served from **`track.delhivery.com`** for BOTH
-> staging and production — do NOT point it at `staging-express` (that host
-> `401`s; its tracking is session-gated, not token-auth).
-> A waybill with no data returns:
-> `{"Success": false, "Error": "Data does not exists for provided Waybill(s)", "rmk": "…"}`.
-> ⚠ A freshly-manifested **staging** waybill was *not* found on
-> `track.delhivery.com` — staging shipments may not propagate there. To get
-> a FULL-data sample (the `ShipmentData` + `Scans` structure below), use a
-> waybill that has real scan history — ask Delhivery for a test waybill, or
-> use the first real production shipment.
+### 3.7 Order Tracking — **this is what nuit builds** ✓ verified, full data
+`GET {baseUrl}/api/v1/packages/json/?waybill=<AWB>&ref_ids=<orderRef>`
+
+> ✓ **Verified with full data.** Same base URL as the other APIs
+> (`staging-express` in dev, `track.delhivery.com` in prod) + the
+> `Authorization: Token <token>` header. Look up by `waybill` OR `ref_ids`
+> (the order id). A waybill with no data returns
+> `{"Success": false, "Error": "Data does not exists for provided Waybill(s)"}`.
+> (The earlier "only track.delhivery.com / staging 401s" finding was an
+> *old, wrong* token — the proper dev token works on `staging-express`.)
 
 - **Pull** (what we use) — GET on demand. **Rate limit: 750 req / 5 min /
   IP** — cache, never poll per page view.
@@ -198,10 +218,12 @@ Response shape (verify field names against a real staging response):
   }]
 }
 ```
-> ⚠ Delhivery's portal renders the field schema only inside a JS app that
-> can't be captured here. The shape above is the well-known Delhivery
-> response — **verify exact field names against a real staging response**
-> when wiring this up, and correct this file.
+> ✓ These field names are confirmed against the **live staging response**.
+> Real values seen: `Status.Status` = "Manifested", `Scans[].ScanDetail`
+> with `Scan` / `ScanType` (UD) / `ScanDateTime` / `ScannedLocation` /
+> `StatusCode` (e.g. "X-UCI") / `Instructions`. Also present on `Shipment`:
+> `Consignee {Name,City,PinCode}`, `OrderType`, `InvoiceAmount`,
+> `Origin`, `Destination`, `PickedupDate`, `DeliveryDate`.
 
 ### 3.8 Edit / Cancel Order
 - Edit: `POST /api/p/edit`
@@ -250,15 +272,34 @@ returns pickup later.
 
 ## 5. What nuit implements
 
-- **Only the Tracking API (Pull)** — §3.7. Backend proxies the call (token
-  stays server-side), the customer tracking UI renders `Scans` as a
-  timeline with the current `Status` as the headline.
-- **Our order `status` is admin-set, not synced from Delhivery.** The admin
-  marks `dispatched` / `delivered` / `failed-delivery` by hand (see
-  `AdminOrdersPage` → `FulfilmentSection`). The Delhivery feed is
-  display-only. Auto-sync via the Push webhook (§3.7) is a future upgrade.
-- Steps 1–6 are **not** in the app — the owner books shipments in the
-  Delhivery portal and types the courier + AWB into the admin panel.
+The shipping pipeline runs **inside the admin panel** — the owner never
+touches the Delhivery portal. Code: `server/src/config/delhivery.js`
+(env-switched config + auth header), `server/src/services/delhivery.js` (the
+API calls), `orderController.js` (the endpoints), `AdminOrdersPage` /
+`AdminPickupsPage` (the UI).
+
+- **Manifest (Order Creation, §3.4)** — `POST /api/orders/admin/:id/manifest`
+  `{ weight, dimensions }` → `createShipment` mints a waybill and registers
+  the shipment. Order goes `accepted → manifested`, storing
+  `courier:'delhivery'` + `trackingId` (the waybill). The
+  `pickup_location.name` MUST exactly match a registered warehouse name (the
+  `end_date` gotcha — see §3.4).
+- **Batch Pickup (§3.6)** — `POST /api/orders/admin/pickup`
+  `{ orderIds, pickupDate, pickupTime }` → `schedulePickup` with
+  `count = orderIds.length`. Booked orders go `manifested → dispatched` and
+  store `pickupId`. The Pickups panel (`/admin/pickups`) lists manifested
+  orders for batch selection — one pickup collects them all.
+- **Packing Slip / label (§3.5)** — `GET /api/orders/admin/:id/label` →
+  `getPackingSlip` returns the PDF link; "Print label" opens it.
+- **Tracking (Pull, §3.7)** — backend proxies the call (token stays
+  server-side); the customer tracking UI (still to build) renders `Scans` as
+  a timeline with the current `Status` as the headline.
+- **Our order `status` past `dispatched` is admin-set, not synced from
+  Delhivery.** The admin marks `delivered` / `failed-delivery` by hand. The
+  Delhivery tracking feed is display-only. Auto-sync via the Push webhook
+  (§3.7) is a future upgrade.
+- **Delhivery is the only shipping path** — there is no manual-courier
+  fallback. Every paid+accepted order ships via the manifest → pickup flow.
 
 ---
 
@@ -266,10 +307,9 @@ returns pickup later.
 
 To test tracking you need a waybill that exists in Delhivery **staging**:
 1. Confirm you hold the **sandbox token**; use the `staging-express` base URL.
-2. Easiest — create a **test shipment in the Delhivery staging portal** by
-   hand to mint a trackable test AWB. (No code; we don't need to build
-   Steps 2–6.)
-3. Alternatively run the pipeline against staging: warehouse → waybill →
+2. Easiest — manifest a paid+accepted test order through the admin panel
+   (or run the service directly) to mint a trackable test AWB.
+3. Or run the pipeline against staging by hand: warehouse → waybill →
    order creation → get the AWB.
 4. Track that AWB through our endpoint against staging.
 5. Go-live: `NODE_ENV=production` switches the base URL — no other change.
