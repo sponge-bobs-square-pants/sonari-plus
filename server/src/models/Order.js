@@ -59,6 +59,24 @@ const billOfSupplySchema = new mongoose.Schema(
   { _id: false },
 )
 
+/**
+ * One Delhivery tracking scan, pushed in real time by the Scan Push webhook
+ * (POST /api/orders/delhivery-webhook). Append-only; the UI sorts by
+ * `scannedAt`. `statusType` is Delhivery's family code — UD (in transit),
+ * DL (Delivered OR RTO — disambiguate by `status`), RT/PP/PU/CN (returns).
+ */
+const trackingScanSchema = new mongoose.Schema(
+  {
+    status: { type: String, default: '' }, // 'In Transit', 'Delivered', 'RTO'…
+    statusType: { type: String, default: '' }, // UD | DL | RT | PP | PU | CN
+    nslCode: { type: String, default: '' }, // granular code, e.g. 'X-UCI'
+    location: { type: String, default: '' }, // StatusLocation
+    instructions: { type: String, default: '' },
+    scannedAt: { type: Date }, // StatusDateTime
+  },
+  { _id: false },
+)
+
 const orderSchema = new mongoose.Schema(
   {
     user: {
@@ -129,9 +147,19 @@ const orderSchema = new mongoose.Schema(
     // Delhivery pickup-request id — set when a courier pickup is booked
     // for this order's parcel at dispatch (null until then).
     pickupId: { type: Number, default: null },
+
+    // Delhivery tracking scans, pushed in real time via the Scan Push
+    // webhook. Append-only (deduped on statusType+status+scannedAt). The
+    // 'DL'/'Delivered' scan flips the order to delivered (+ stamps
+    // returnDeadline from the real delivery date); 'DL'/'RTO' → failed-delivery.
+    trackingScans: { type: [trackingScanSchema], default: [] },
   },
   { timestamps: true },
 )
+
+// The Scan Push webhook looks orders up by waybill on every scan — keep it
+// indexed so that lookup stays well under Delhivery's 500ms response budget.
+orderSchema.index({ trackingId: 1 })
 
 orderSchema.index({ user: 1, createdAt: -1 })
 

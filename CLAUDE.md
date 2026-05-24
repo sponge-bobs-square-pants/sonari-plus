@@ -220,8 +220,10 @@ a listener middleware (`features/cart/cartListener.js`, prepended in
   (`{ status, checkedAt }` — the admin's stored Razorpay re-check result),
   `billOfSupply` (`{ number, url, issuedAt }` — null until generated),
   `courier`/`trackingId` (set when shipped — `trackingId` is the Delhivery
-  waybill), and `pickupId` (the Delhivery pickup-request id, set when a batch
-  pickup is booked).
+  waybill), `pickupId` (the Delhivery pickup-request id, set when a batch
+  pickup is booked), and `trackingScans[]` (Delhivery scans pushed by the
+  Scan Push webhook — append-only, deduped; the `DL`/`Delivered` scan flips
+  the order to delivered).
 - Flow: `POST /api/orders/create` builds a pending Order + a Razorpay order
   (totals computed server-side from the DB cart — client totals never trusted)
   → client opens Razorpay → `POST /api/orders/verify` checks the HMAC
@@ -307,6 +309,17 @@ a listener middleware (`features/cart/cartListener.js`, prepended in
   verified against the RAW body (`index.js` keeps it on `req.rawBody` via the
   `express.json` `verify` hook); mounted before `protect` since it has no
   session. Secret: `RAZORPAY_DEV/PROD_WEBHOOK_SECRET`. Idempotent with verify.
+- `POST /api/orders/delhivery-webhook` — Delhivery's **Scan Push** (built;
+  goes live once Delhivery enables it for our prod URL — needs the public
+  domain + their requirement-doc process to `lastmile-integration@delhivery.com`).
+  Verified by a shared-secret header (`x-delhivery-token` =
+  `DELHIVERY_DEV/PROD_WEBHOOK_TOKEN`), mounted before `protect`. Appends each
+  scan to `order.trackingScans[]` (deduped) and advances status on terminal
+  scans: `DL`/`Delivered` → `delivered` (+ `returnDeadline` from the real
+  delivery date), `DL`/`RTO` → `failed-delivery`. **Must reply 200 in <500ms**
+  (Delhivery drops the scan otherwise) — so one indexed (`trackingId`) lookup +
+  save; idempotent. This is how `delivered` is reached automatically; the admin
+  "Mark delivered" button stays as a fallback. Full spec: `DELHIVERY.md` §3.7a.
 - Not yet done: order-confirmation emails — planned to fire on the webhook
   confirmation (best-effort, exactly once per order); blocked on buying the
   store domain + an email provider. Tracked in `UPGRADES.md` → Order emails.

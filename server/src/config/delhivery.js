@@ -21,6 +21,12 @@ export const DELHIVERY = {
   // else order creation / pickup reject it ("ClientWarehouse … does not
   // exist"). Override per-account via env.
   pickupWarehouse: process.env.DELHIVERY_PICKUP_WAREHOUSE || 'SONARI NIGHT WEAR',
+  // Shared secret WE define for the Scan Push webhook — Delhivery sends it
+  // as the `x-delhivery-token` header on every scan POST so we can verify
+  // the call is genuinely theirs (see DELHIVERY.md). Env-switched like the key.
+  webhookToken: isProd
+    ? process.env.DELHIVERY_PROD_WEBHOOK_TOKEN
+    : process.env.DELHIVERY_DEV_WEBHOOK_TOKEN,
 }
 
 if (!DELHIVERY.token) {

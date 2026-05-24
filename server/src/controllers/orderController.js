@@ -16,6 +16,7 @@ import {
   schedulePickup,
   getPackingSlip,
 } from '../services/delhivery.js'
+import { DELHIVERY } from '../config/delhivery.js'
 
 // Must mirror client/src/data/shipping.js — the server is the source of
 // truth for money, so the client's totals are never trusted.
@@ -752,5 +753,92 @@ export async function razorpayWebhook(req, res) {
     // A 500 tells Razorpay to retry the webhook later.
     console.error('Razorpay webhook error:', err.message)
     res.status(500).json({ message: 'Webhook processing error.' })
+  }
+}
+
+// The header Delhivery is told (in the Scan Push requirement doc) to send on
+// every webhook POST, carrying our shared secret (DELHIVERY.webhookToken).
+const DELHIVERY_WEBHOOK_HEADER = 'x-delhivery-token'
+
+/**
+ * POST /api/orders/delhivery-webhook — Delhivery's Scan Push.
+ *
+ * Delhivery POSTs every scan for a waybill here in real time:
+ *   { Shipment: { Status: { Status, StatusType, StatusDateTime,
+ *     StatusLocation, Instructions }, NSLCode, ReferenceNo, AWB } }
+ *
+ * We verify the shared-secret header, append the scan to the order's
+ * `trackingScans` (deduped), and advance the order's own status on the
+ * terminal scans. NOTE: StatusType 'DL' covers BOTH 'Delivered' AND 'RTO',
+ * so we disambiguate by `Status` — never by type alone.
+ *
+ * Must reply 200 in <500ms (Delhivery times out and drops the scan
+ * otherwise), so the work is one indexed lookup + save. Idempotent: a
+ * re-pushed scan is deduped and the status guards are no-ops.
+ */
+export async function delhiveryWebhook(req, res) {
+  try {
+    // Verify it's really Delhivery (the token we put in the requirement doc).
+    const expected = DELHIVERY.webhookToken
+    if (!expected || req.get(DELHIVERY_WEBHOOK_HEADER) !== expected) {
+      return res.status(401).json({ message: 'Unauthorized.' })
+    }
+
+    const ship = req.body?.Shipment
+    const scan = ship?.Status
+    // Malformed/empty — ack so Delhivery doesn't keep retrying it.
+    if (!ship || !scan) return res.status(200).json({ received: true })
+
+    const awb = String(ship.AWB || '').trim()
+    const ref = String(ship.ReferenceNo || '').trim()
+
+    // Look up by waybill (indexed); fall back to our order id (ReferenceNo).
+    let order = awb ? await Order.findOne({ trackingId: awb }) : null
+    if (!order && /^[0-9a-fA-F]{24}$/.test(ref)) order = await Order.findById(ref)
+    // Unknown shipment — ack and move on (nothing of ours to update).
+    if (!order) return res.status(200).json({ received: true })
+
+    const statusType = String(scan.StatusType || '')
+    const status = String(scan.Status || '')
+    const scannedAt = scan.StatusDateTime ? new Date(scan.StatusDateTime) : new Date()
+
+    // Append the scan unless we've already stored this exact one.
+    const key = (t) =>
+      `${t.statusType}|${t.status}|${
+        t.scannedAt ? new Date(t.scannedAt).toISOString() : ''
+      }`
+    const incoming = { statusType, status, scannedAt }
+    if (!order.trackingScans.some((t) => key(t) === key(incoming))) {
+      order.trackingScans.push({
+        status,
+        statusType,
+        nslCode: ship.NSLCode || '',
+        location: scan.StatusLocation || '',
+        instructions: scan.Instructions || '',
+        scannedAt,
+      })
+    }
+
+    // Terminal scans advance our own status. 'DL' is shared by Delivered and
+    // RTO, so branch on `Status`, not the type.
+    if (statusType === 'DL') {
+      const s = status.toLowerCase()
+      if (s === 'delivered' && order.status !== 'delivered') {
+        order.status = 'delivered'
+        // Stamp the return window from the REAL delivery date, not now().
+        order.returnDeadline = new Date(
+          scannedAt.getTime() + RETURN_WINDOW_DAYS * DAY_MS,
+        )
+      } else if (s === 'rto' && order.status !== 'failed-delivery') {
+        order.status = 'failed-delivery'
+      }
+    }
+
+    await order.save()
+    return res.status(200).json({ received: true })
+  } catch (err) {
+    // A 500 lets Delhivery retry; our dedupe + guards make that safe.
+    console.error('Delhivery webhook error:', err.message)
+    return res.status(500).json({ message: 'Webhook processing error.' })
   }
 }

@@ -185,11 +185,9 @@ warehouse's manifested parcels).
 > (The earlier "only track.delhivery.com / staging 401s" finding was an
 > *old, wrong* token — the proper dev token works on `staging-express`.)
 
-- **Pull** (what we use) — GET on demand. **Rate limit: 750 req / 5 min /
-  IP** — cache, never poll per page view.
-- **Push** — Delhivery `POST`s every scan to a webhook we host. Needs the
-  endpoint URL + 1–2 live waybills + a sample curl given to Delhivery; ~5–6
-  working days for them to enable. A possible later upgrade — not built.
+- **Pull** — GET on demand. **Rate limit: 750 req / 5 min / IP** — cache,
+  never poll per page view. (Used only ad-hoc; the webhook is our live feed.)
+- **Push (BUILT)** — Delhivery `POST`s every scan to our webhook. See §3.7a.
 
 Response shape (verify field names against a real staging response):
 ```jsonc
@@ -224,6 +222,39 @@ Response shape (verify field names against a real staging response):
 > `StatusCode` (e.g. "X-UCI") / `Instructions`. Also present on `Shipment`:
 > `Consignee {Name,City,PinCode}`, `OrderType`, `InvoiceAmount`,
 > `Origin`, `Destination`, `PickedupDate`, `DeliveryDate`.
+
+### 3.7a Scan Push Webhook — **BUILT** (our live tracking feed)
+Delhivery `POST`s every scan, in real time, to
+`POST /api/orders/delhivery-webhook` (`delhiveryWebhook` in
+`orderController.js`, mounted before `protect`). This is how an order becomes
+**delivered** automatically.
+
+- **Setup is NOT self-serve.** Fill the **Scan Push Webhook Requirement
+  Document** (dev + prod account name, endpoint URL, auth header key/value)
+  and email it to **lastmile-integration@delhivery.com** (cc your business
+  POC). Delhivery's tech team tests it, then enables it. Scan Push and
+  Document (POD) Push are **separate** webhooks.
+- **Auth:** a header key/value WE choose, declared in the doc. We use
+  `x-delhivery-token: <DELHIVERY_*_WEBHOOK_TOKEN>` and the handler rejects any
+  POST whose header doesn't match. (Optionally also whitelist Delhivery's
+  source IPs at nginx/firewall — listed in `server/.env.example`.)
+- **≤500ms response budget.** If our endpoint is slower, Delhivery times out
+  and **drops the scan**. So the handler does just one indexed lookup
+  (`trackingId` is indexed) + save, and replies `200`. Idempotent: scans are
+  deduped on `statusType+status+scannedAt`, status flips are guarded — so a
+  re-pushed/retried scan is a no-op.
+- **Payload** (default): `{ Shipment: { Status: { Status, StatusType,
+  StatusDateTime, StatusLocation, Instructions }, NSLCode, ReferenceNo, AWB } }`.
+  We match the order by `AWB` (= `trackingId`), falling back to `ReferenceNo`
+  (= our order `_id`). Every scan is appended to `order.trackingScans[]`.
+- **Status mapping — the `DL` gotcha.** `StatusType` is a family code; the
+  forward-shipment ones are `UD` (Manifested / Not Picked / In Transit /
+  Pending / Dispatched) and `DL`. **`DL` is BOTH `Delivered` AND `RTO`** — so
+  we branch on `Status`, never the type:
+  - `DL` + `Delivered` → order `delivered`, `returnDeadline` = the scan's real
+    delivery date + 10 days.
+  - `DL` + `RTO` → order `failed-delivery`.
+  - everything else → stored as a timeline scan only (no status change).
 
 ### 3.8 Edit / Cancel Order
 - Edit: `POST /api/p/edit`
@@ -291,13 +322,21 @@ API calls), `orderController.js` (the endpoints), `AdminOrdersPage` /
   orders for batch selection — one pickup collects them all.
 - **Packing Slip / label (§3.5)** — `GET /api/orders/admin/:id/label` →
   `getPackingSlip` returns the PDF link; "Print label" opens it.
-- **Tracking (Pull, §3.7)** — backend proxies the call (token stays
-  server-side); the customer tracking UI (still to build) renders `Scans` as
-  a timeline with the current `Status` as the headline.
-- **Our order `status` past `dispatched` is admin-set, not synced from
-  Delhivery.** The admin marks `delivered` / `failed-delivery` by hand. The
-  Delhivery tracking feed is display-only. Auto-sync via the Push webhook
-  (§3.7) is a future upgrade.
+- **Scan Push webhook (§3.7a) — BUILT.** Delhivery POSTs every scan to
+  `POST /api/orders/delhivery-webhook`; scans are stored on
+  `order.trackingScans[]`, and a `DL`/`Delivered` scan flips the order to
+  `delivered` (stamping `returnDeadline` from the real delivery date),
+  `DL`/`RTO` → `failed-delivery`. Goes live once Delhivery enables the webhook
+  for our endpoint (requires the public URL + their requirement-doc process).
+- **Tracking (Pull, §3.7)** — kept for ad-hoc lookups; the webhook is the
+  live feed. Customer-facing, the decision is to show our own status ("On its
+  way") plus a link out to Delhivery's tracking page, rather than render the
+  full scan timeline in-app (revisitable now that scans are stored).
+- **Order `status` is admin-driven UP TO `dispatched`, then webhook-driven.**
+  Admin actions set `placed → accepted → manifested → dispatched`; the
+  webhook sets `delivered` / `failed-delivery` automatically. A manual
+  "Mark delivered" button remains as a fallback/override until the webhook is
+  live in production.
 - **Delhivery is the only shipping path** — there is no manual-courier
   fallback. Every paid+accepted order ships via the manifest → pickup flow.
 
