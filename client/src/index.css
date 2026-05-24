@@ -161,6 +161,85 @@
   animation: build-y 0.8s var(--ease-calm) both;
 }
 
+/* Tracking-timeline sprite animations — each rides the leg leaving its step.
+   They're sprite sheets played frame-by-frame: `steps(N)` jumps the scaled
+   strip one frame-width at a time, never interpolating. The strip is scaled
+   to N × the element width, and the keyframe shifts it by its full width, so
+   each of the N stops shows exactly one clean frame.
+
+   .hourglass — sand draining + flip, 27 frames (Placed → Confirmed)
+   .walker    — delivery man on the move, 7 frames (Confirmed → Preparing)
+   .trolley   — loading a trolley, 36 frames (Preparing → On its way)
+   .truck     — delivery truck rolling, 16 frames (On its way → Delivered) */
+.hourglass {
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem; /* 220 × 220 square frames */
+  background-image: url('./assets/hourglass_physically_correct_loop_27_frame_transparent.png');
+  background-repeat: no-repeat;
+  background-size: 40.5rem 1.5rem; /* 27 frames × 1.5rem wide */
+  animation: hourglass-sprite 2.4s steps(27) infinite;
+}
+@keyframes hourglass-sprite {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -40.5rem 0;
+  }
+}
+.walker {
+  display: block;
+  width: 1.1rem;
+  height: 1.75rem; /* native frame ratio 190:302 */
+  background-image: url('./assets/delivery_walk_sprite_animation_ready_transparent.png');
+  background-repeat: no-repeat;
+  background-size: 7.7rem 1.75rem; /* 7 frames × 1.1rem wide */
+  animation: walk-sprite 0.8s steps(7) infinite;
+}
+@keyframes walk-sprite {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -7.7rem 0;
+  }
+}
+.trolley {
+  display: block;
+  width: 2.7rem;
+  height: 1.24rem; /* native frame ratio 380:174 (landscape) */
+  background-image: url('./assets/trolley_load_sprite.png');
+  background-repeat: no-repeat;
+  background-size: 97.2rem 1.24rem; /* 36 frames × 2.7rem wide */
+  animation: trolley-sprite 2.2s steps(36) infinite;
+}
+@keyframes trolley-sprite {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -97.2rem 0;
+  }
+}
+.truck {
+  display: block;
+  width: 2.4rem;
+  height: 1.05rem; /* native frame ratio 240:104 (landscape) */
+  background-image: url('./assets/delivery_truck_sprite.png');
+  background-repeat: no-repeat;
+  background-size: 38.4rem 1.05rem; /* 16 frames × 2.4rem wide */
+  animation: truck-sprite 1.4s steps(16) infinite;
+}
+@keyframes truck-sprite {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -38.4rem 0;
+  }
+}
+
 /* Reveal-on-scroll: hidden until the .is-visible class is added
    by the IntersectionObserver in useReveal(). */
 .reveal {
@@ -180,7 +259,11 @@
   .animate-fade-in,
   .animate-menu-in,
   .build-x,
-  .build-y {
+  .build-y,
+  .walker,
+  .hourglass,
+  .trolley,
+  .truck {
     animation: none;
   }
   .reveal {

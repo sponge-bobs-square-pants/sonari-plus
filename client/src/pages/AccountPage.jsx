@@ -124,85 +124,271 @@ function formatFullDate(iso) {
   })
 }
 
+/* ── Order-tracking timeline ───────────────────────
+   The order's lifecycle drawn as a vertical run of bubbles. Driven by the
+   order's own `status` for now (no courier call yet) — later the
+   "On its way → Delivered" leg gains live Delhivery scans. Earlier steps
+   read as done (filled), the current step is ringed, later steps are hollow;
+   `failed-delivery` flips the last bubble to an error state and `cancelled`
+   shows a short notice instead of the run. */
+const TRACK_STEPS = [
+  { key: 'placed', label: 'Order placed', body: 'We’ve received your order.' },
+  {
+    key: 'accepted',
+    label: 'Confirmed',
+    body: 'Payment confirmed — preparing your order.',
+  },
+  {
+    key: 'manifested',
+    label: 'Preparing to ship',
+    body: 'Packed and handed to the courier soon.',
+  },
+  {
+    key: 'dispatched',
+    label: 'On its way',
+    body: 'Picked up by the courier, heading to you.',
+  },
+  {
+    key: 'delivered',
+    label: 'Delivered',
+    body: 'Delivered to your address.',
+  },
+]
+const STEP_ORDER = TRACK_STEPS.map((s) => s.key)
+
+/* Which sprite rides the leg LEAVING step i — shown only while the order is
+   parked AT that step (i === currentIndex). Each value is a CSS sprite class
+   in index.css; segments without one just keep their plain line.
+     0  Placed → Confirmed      — hourglass (waiting to be confirmed)
+     1  Confirmed → Preparing    — delivery man on the move
+     2  Preparing → On its way   — loading a trolley
+     3  On its way → Delivered   — delivery truck rolling */
+const SEGMENT_SPRITE = ['hourglass', 'walker', 'trolley', 'truck']
+
+/* A frame-by-frame sprite (see the sprite classes in index.css), absolutely
+   centred on its timeline connector. */
+function SegmentSprite({ cls }) {
+  return (
+    <span
+      className={`${cls} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
+      aria-hidden="true"
+    />
+  )
+}
+
+function TrackingTimeline({ order, compact = false }) {
+  if (order.status === 'cancelled') {
+    return (
+      <div className="mt-5 rounded-xl bg-linen/60 p-4 text-center">
+        <p className="font-display text-base font-light text-ink">
+          Order cancelled
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-clay">
+          This order was cancelled. Any payment is refunded.
+        </p>
+      </div>
+    )
+  }
+
+  const failed = order.status === 'failed-delivery'
+  // How far along the happy path we are. A failed delivery sits at the
+  // 'dispatched' step, with the final bubble shown as an error.
+  const currentIndex = failed
+    ? STEP_ORDER.indexOf('dispatched')
+    : STEP_ORDER.indexOf(order.status)
+
+  // The gap below each step — wider when the body blurb is shown, tighter
+  // in the slim-bar (compact) layout that drops it.
+  const rowGap = compact ? 'pb-5' : 'pb-7'
+
+  return (
+    <ol className={compact ? 'mt-5' : 'mt-6'}>
+      {TRACK_STEPS.map((step, i) => {
+        const isLast = i === TRACK_STEPS.length - 1
+        const done = i < currentIndex
+        const current = i === currentIndex
+        const reached = done || current
+        const error = failed && isLast // the final bubble, on a failed delivery
+        // A segment shows its sprite only while it's the active leg (the
+        // order is parked at this step). When a sprite is on, the line is
+        // dropped so it's just the animation.
+        const spriteCls = SEGMENT_SPRITE[i]
+        const hasSprite = !!spriteCls && i === currentIndex
+
+        return (
+          <li key={step.key} className={`flex ${compact ? 'gap-3' : 'gap-4'}`}>
+            {/* Bubble + the hairline dropping to the next step (the "bar") */}
+            <div className="flex flex-col items-center">
+              <span
+                className={[
+                  'mt-0.5 h-3 w-3 shrink-0 rounded-full transition-colors',
+                  error
+                    ? 'bg-dusk'
+                    : done
+                      ? 'bg-ink'
+                      : current
+                        ? 'bg-ink ring-4 ring-ink/12'
+                        : 'border border-greige bg-canvas',
+                ].join(' ')}
+              />
+              {!isLast && (
+                <span
+                  className={`relative my-1 w-px flex-1 ${
+                    hasSprite
+                      ? 'min-h-[2.4rem]' // give the active sprite room to breathe
+                      : done
+                        ? 'bg-ink/40'
+                        : 'bg-linen'
+                  }`}
+                >
+                  {/* The active leg's sprite replaces the line */}
+                  {hasSprite && <SegmentSprite cls={spriteCls} />}
+                </span>
+              )}
+            </div>
+
+            {/* Step label (+ blurb when not compact) */}
+            <div className={isLast ? '' : rowGap}>
+              <p
+                className={`text-sm leading-snug ${
+                  error ? 'text-dusk' : reached ? 'text-ink' : 'text-greige'
+                }`}
+              >
+                {error ? 'Delivery failed' : step.label}
+              </p>
+              {!compact && (
+                <p
+                  className={`mt-0.5 text-xs leading-relaxed ${
+                    reached ? 'text-clay' : 'text-greige'
+                  }`}
+                >
+                  {error
+                    ? 'The courier couldn’t deliver — we’ll be in touch.'
+                    : step.body}
+                </p>
+              )}
+              {i === 0 && (
+                <p className="mt-1 text-xs text-clay">
+                  {formatFullDate(order.createdAt)}
+                </p>
+              )}
+            </div>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+// Side-by-side column widths (rem) used when the screen is wide enough to
+// place the panels beside the images. The tracking timeline is a SLIM
+// vertical bar (not a card) to the right of the summary card, so the row
+// stays inside the page width.
+const CARD_REM = 25
+const TRACK_REM = 11
+const COL_GAP_REM = 1.75
+
 /* ── Order detail panel ───────────────────────────
    Expands when one of an order's products is clicked — part of the page,
-   not a popup. When `sideBySide` (a wide screen) it is ABSOLUTELY positioned
-   beside the images, pinned at the TOP only — so its height is just its own
-   content (shorter than the product images), and opening it never grows the
-   card or shifts the orders below. On a narrow screen it stacks below the
-   images instead. More sections will be added here later. */
-function OrderDetailPanel({ order, cols, sideBySide, onClose }) {
+   not a popup. When `sideBySide` (a wide screen) the summary card is
+   ABSOLUTELY positioned beside the images, pinned at the TOP only — so
+   opening it never shifts the orders below. The tracking timeline, when
+   open, is a SECOND panel positioned just to the right of that card (outside
+   it). On a narrow screen both stack below the images instead. */
+function OrderDetailPanel({ order, cols, sideBySide, tracking, onTrack, onClose }) {
   const orderNo = order._id.slice(-8).toUpperCase()
-  // Absolute layout: the panel's left edge sits just past the image grid —
+  // Absolute layout: the card's left edge sits just past the image grid —
   // cols × THUMB_REM thumbnails + (cols−1) × 1rem gaps + a 2rem gutter.
   const leftRem = cols * THUMB_REM + (cols - 1) + 2
 
-  return (
-    <div
-      className="animate-fade-up rounded-[1.25rem] bg-oat p-6 shadow-[0_24px_56px_-34px_rgba(46,42,38,0.4)] ring-1 ring-linen"
-      style={
-        sideBySide
-          ? {
-              position: 'absolute',
-              top: 0,
-              left: `${leftRem}rem`,
-              right: 0,
-              maxWidth: '25rem',
-            }
-          : { marginTop: '1.75rem', maxWidth: '25rem' }
+  const chrome =
+    'animate-fade-up rounded-[1.25rem] bg-oat p-6 shadow-[0_24px_56px_-34px_rgba(46,42,38,0.4)] ring-1 ring-linen'
+
+  const cardStyle = sideBySide
+    ? { position: 'absolute', top: 0, left: `${leftRem}rem`, width: `${CARD_REM}rem` }
+    : { marginTop: '1.75rem', maxWidth: '25rem' }
+
+  const trackStyle = sideBySide
+    ? {
+        position: 'absolute',
+        top: 0,
+        left: `${leftRem + CARD_REM + COL_GAP_REM}rem`,
+        width: `${TRACK_REM}rem`,
       }
-    >
-      {/* Header — the order number is the card's title */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="eyebrow text-clay">Order</p>
-          <p className="mt-1.5 font-display text-2xl font-light tracking-tight text-ink">
-            #{orderNo}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close order details"
-          className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-full p-2 text-clay transition-colors hover:bg-linen hover:text-ink"
-        >
-          <Icon name="close" className="h-4 w-4" />
-        </button>
-      </div>
+    : { marginTop: '1.25rem', maxWidth: '25rem' }
 
-      {/* Dates — two quiet columns, set apart by whitespace, not rules */}
-      <dl className="mt-6 grid grid-cols-2 gap-x-5 gap-y-1.5">
-        <dt className="eyebrow text-clay">Placed</dt>
-        <dt className="eyebrow text-clay">Return by</dt>
-        <dd className="text-sm text-ink">{formatFullDate(order.createdAt)}</dd>
-        <dd className="text-sm text-ink">
-          {order.returnDeadline ? formatFullDate(order.returnDeadline) : '—'}
-        </dd>
-      </dl>
-
-      {/* Actions — Invoice + Track (Track's logic lands later) */}
-      <div className="mt-7 flex gap-3">
-        {order.billOfSupply?.url ? (
-          <Button
-            as="a"
-            href={order.billOfSupply.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            variant="outline"
-            className="flex-1"
+  return (
+    <>
+      {/* Summary card */}
+      <div className={chrome} style={cardStyle}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="eyebrow text-clay">Order</p>
+            <p className="mt-1.5 font-display text-2xl font-light tracking-tight text-ink">
+              #{orderNo}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close order details"
+            className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-full p-2 text-clay transition-colors hover:bg-linen hover:text-ink"
           >
-            Invoice
+            <Icon name="close" className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Dates — two quiet columns, set apart by whitespace, not rules */}
+        <dl className="mt-6 grid grid-cols-2 gap-x-5 gap-y-1.5">
+          <dt className="eyebrow text-clay">Placed</dt>
+          <dt className="eyebrow text-clay">Return by</dt>
+          <dd className="text-sm text-ink">{formatFullDate(order.createdAt)}</dd>
+          <dd className="text-sm text-ink">
+            {order.returnDeadline ? formatFullDate(order.returnDeadline) : '—'}
+          </dd>
+        </dl>
+
+        {/* Actions — Invoice + Track (Track opens the timeline panel) */}
+        <div className="mt-7 flex gap-3">
+          {order.billOfSupply?.url ? (
+            <Button
+              as="a"
+              href={order.billOfSupply.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="outline"
+              className="flex-1"
+            >
+              Invoice
+            </Button>
+          ) : (
+            <Button variant="outline" className="flex-1" disabled>
+              Invoice
+            </Button>
+          )}
+          <Button
+            variant={tracking ? 'outline' : 'solid'}
+            className="flex-1"
+            onClick={() => onTrack(!tracking)}
+          >
+            {tracking ? 'Hide' : 'Track'}
           </Button>
-        ) : (
-          <Button variant="outline" className="flex-1" disabled>
-            Invoice
-          </Button>
-        )}
-        <Button variant="solid" className="flex-1">
-          Track
-        </Button>
+        </div>
       </div>
-    </div>
+
+      {/* Tracking timeline — a slim vertical bar to the RIGHT of the card
+          (no card chrome, so it fits the gutter). On a narrow screen it
+          stacks below the card, set off by a hairline. */}
+      {tracking && (
+        <div
+          style={trackStyle}
+          className={sideBySide ? undefined : 'border-t border-linen pt-5'}
+        >
+          <p className="eyebrow text-clay">Tracking</p>
+          <TrackingTimeline order={order} compact />
+        </div>
+      )}
+    </>
   )
 }
 
@@ -211,6 +397,7 @@ function Purchases() {
   const [orders, setOrders] = useState([])
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [expandedId, setExpandedId] = useState(null) // order with its panel open
+  const [tracking, setTracking] = useState(false) // tracking panel open for it?
   // The detail panel sits beside the images only when the screen is wide
   // enough (≥1024px); below that it stacks underneath instead.
   const [wide, setWide] = useState(
@@ -252,8 +439,16 @@ function Purchases() {
     )
   }
 
-  // Clicking a product toggles its order's detail panel.
-  const toggle = (id) => setExpandedId((cur) => (cur === id ? null : id))
+  // Clicking a product toggles its order's detail panel. Switching orders (or
+  // closing) always collapses the tracking panel back down.
+  const toggle = (id) => {
+    setTracking(false)
+    setExpandedId((cur) => (cur === id ? null : id))
+  }
+  const close = () => {
+    setTracking(false)
+    setExpandedId(null)
+  }
 
   return (
     <ul className="space-y-14">
@@ -278,10 +473,13 @@ function Purchases() {
               {formatPrice(order.total)}
             </p>
 
-            {/* Images, and — when expanded — the detail panel. Side-by-side,
-                the panel is absolutely positioned (position: relative here
-                anchors it), so opening it never grows the card or shifts the
-                orders below. Narrow screens stack it. Click toggles it. */}
+            {/* Images, and — when expanded — the detail panels. Side-by-side,
+                they're absolutely positioned (position: relative here anchors
+                them), so opening either one never grows the card or shifts the
+                orders below. The tracking panel sits out in the right gutter,
+                past where lower orders have any content, so even when it's
+                taller than the images it overlaps nothing. Narrow screens
+                stack everything. Click toggles it. */}
             <div
               className="mt-7"
               style={sideBySide ? { position: 'relative' } : undefined}
@@ -296,7 +494,9 @@ function Purchases() {
                   order={order}
                   cols={Math.min(order.items.length, 3)}
                   sideBySide={sideBySide}
-                  onClose={() => setExpandedId(null)}
+                  tracking={tracking}
+                  onTrack={setTracking}
+                  onClose={close}
                 />
               )}
             </div>
