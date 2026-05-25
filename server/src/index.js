@@ -13,11 +13,19 @@ import { notFound, errorHandler } from './middleware/error.js'
 
 const app = express()
 const PORT = process.env.PORT || 5000
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173'
+// Allowed browser origins — comma-separated in CLIENT_URL. In prod this is
+// the storefront's real origin(s), e.g. "https://www.nuit.in,https://nuit.in";
+// in dev it's the Vite server. (Backend lives at backend.nuit.in — a
+// different origin, so the frontend's calls are cross-origin and need CORS.)
+const CLIENT_URLS = (process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
 
-// `credentials: true` + a specific origin lets the browser send and
-// receive the httpOnly auth cookie on cross-origin (port) requests.
-app.use(cors({ origin: CLIENT_URL, credentials: true }))
+// `credentials: true` + specific origins lets the browser send and receive
+// the httpOnly auth cookie on cross-origin requests (the SPA on www.nuit.in
+// calling the API on backend.nuit.in).
+app.use(cors({ origin: CLIENT_URLS, credentials: true }))
 app.use(
   express.json({
     // Keep the raw body — the Razorpay webhook verifies its signature

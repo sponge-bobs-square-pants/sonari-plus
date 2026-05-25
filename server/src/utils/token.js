@@ -20,7 +20,11 @@ export function signToken(user) {
  * Cookie options for the auth token.
  *  - httpOnly: JavaScript (and therefore XSS) cannot read it
  *  - secure:   HTTPS-only in production; off for local http dev
- *  - sameSite: 'lax' is fine — client and API share the localhost site
+ *  - sameSite: 'lax' is correct even across subdomains — www.nuit.in and
+ *    backend.nuit.in share the same registrable site (nuit.in), so the API
+ *    call counts as *same-site* and Lax cookies are sent. (Lax only blocks
+ *    truly cross-site requests, so it keeps CSRF surface smaller than 'none'.)
+ *    The cookie is host-only to backend.nuit.in — no Domain attribute needed.
  */
 export const cookieOptions = {
   httpOnly: true,
