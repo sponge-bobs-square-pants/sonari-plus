@@ -18,6 +18,32 @@ so they never go stale. Read the referenced files for detail.
 - First admin account: `cd server && npm run seed:admin`
 - Env templates: `server/.env.example`, `client/.env.example`.
 
+## Deployment
+
+Live on a **DigitalOcean droplet** (`143.110.184.135`, Ubuntu, 1GB). Domains
+(GoDaddy DNS): **www.nuit.in** (frontend; apex `nuit.in` 301s → www) and
+**backend.nuit.in** (API). MongoDB is **Atlas** (droplet IP allowlisted).
+
+- **Each app ships via its own `Dockerfile` + `Makefile`** (`client/`,
+  `server/`) on the Docker Hub flow: `make build-deploy` = build `linux/amd64`
+  (the Mac is arm64) → push to `nuitdotin/<img>` → SSH the droplet, pull, run.
+  Bump `TAG`/`OLD_TAG` per release. Build LOCALLY (the 1GB droplet can't).
+- **Containers bind to `127.0.0.1`** (backend `:5174`, frontend `:8080`); the
+  **host nginx** (apt-installed, not containerized) reverse-proxies the domains
+  to them, with **certbot** TLS (auto-renewing; verified). vhosts in
+  `/etc/nginx/sites-available/`.
+- **Backend env** lives in `/root/Nuit/backend/.env` ON THE DROPLET, passed via
+  `--env-file`. ⚠️ `--env-file` is read at `docker run`, NOT on `docker restart`
+  or file-edit — you must **recreate the container** (`make deploy`) for env
+  changes to apply.
+- **Frontend has no runtime env** — `VITE_API_URL` (`https://backend.nuit.in/api`)
+  is baked at build time by the Makefile build-arg; changing it needs a rebuild.
+- **Deploy order: backend first, then frontend** — the frontend's invoice links
+  call backend routes that must exist first.
+- `NODE_ENV=production` switches BOTH Razorpay and Delhivery to prod keys at
+  once. Currently the droplet runs `NODE_ENV=development` (test keys) — a
+  soft-launch; Razorpay prod keys aren't set yet.
+
 ## Design system — READ BEFORE building any UI
 
 The brand direction is **"Quiet Gallery / Soft Minimal"** — calm, image-led,
@@ -89,9 +115,11 @@ brainstorm; the exploration screens are the design references:
   `protect` + `requireAdmin` middleware. Client: `RequireAuth` / `RequireAdmin`
   route guards + `features/auth/authSlice.js`. `apiClient` sends `credentials:'include'`.
 - **Product model** → `server/src/models/Product.js`: `company` · `colors` →
-  `sizes` → `{ price, stock }` · `images` · `featuredImage` (a dedicated
-  "New this week" cover) · `gender` (`'' | 'boy' | 'girl'` — only set for the
-  `kids` category). `totalStock` is a virtual. `priceFrom` is a **real,
+  `sizes` → `{ size, cup, price, stock }` · `images` · `featuredImage` (a
+  dedicated "New this week" cover) · `gender` (`'' | 'boy' | 'girl'` — only set
+  for the `kids` category). A variant is identified by `(size, cup)`; `cup` is
+  empty for every category EXCEPT bras (where `size` is the band, `cup` the
+  cup). `totalStock` is a virtual. `priceFrom` is a **real,
   indexed field** (denormalised from the variant tree) — virtuals can't be
   sorted or range-filtered in Mongo, and `/shop` needs both. Kept in sync by
   `pre('save')` + `pre('findOneAndUpdate')` hooks — never set it by hand.
@@ -100,14 +128,27 @@ brainstorm; the exploration screens are the design references:
   never sees the Cloudinary secret — uploads proxy through Express.
 - Redux store: `cart` + `auth` slices (`client/src/app/store.js`).
 - Categories are fixed site structure (`client/src/data/categories.js`), not
-  data. Five of them: Cordset · Night suits · Bras · Panties · Kids. Each
+  data. Five of them: Cordset · Night wear · Bras · Panties · Kids. Each
   carries a `sizes` array (apparel = XS–XL, Kids = 8–16) — the single source
   for the admin form's size toggles and the filter. A category with no `span`
   (Kids) is shown in the menu/shop but is NOT a homepage gallery tile.
+- **Bras are TWO-AXIS (band × cup).** The bras category also carries a `cups`
+  list (`A–G`); `sizes` is then the band list (`28–44`). Having `cups` is what
+  flags a category as two-axis everywhere. A variant gains an optional `cup`
+  field (empty for every other category, so their identity stays exactly
+  `(colour, size)`); a bra variant's identity is `(colour, band, cup)`. Helpers
+  in `categories.js`: `cupsForCategory(id)` and `displaySize({size,cup})` →
+  the customer-facing label (`'32B'` for bras, plain `size` otherwise — use it
+  anywhere a size is shown: cart, order, invoice). Admin form shows a band×cup
+  toggle grid; the product page shows Band then Cup selectors. **Anything
+  touching a variant must match on BOTH `size` and `cup`** (stock decrement,
+  cart line key, order snapshot) — see `reduceStockForOrder`/`createOrder`.
 - **Category is navigation, not a filter.** `/shop?category=<id>` (set by the
   menu + category tiles) scopes the shop; an unknown value shows everything.
   The filter panel handles size / price / sort — plus a boy/girl `gender`
-  filter shown ONLY when browsing `kids` (gated by category in `ShopPage`).
+  filter shown ONLY when browsing `kids`, and **Band + Cup** filter groups
+  shown ONLY when browsing `bras` (both gated by category in `ShopPage`;
+  backend `?cups=` CSV → `colors.sizes.cup $in`).
 - The announcement bar is **home page only** (`<Header announcement />`).
   `Header` props: `solid` (force the solid state), `border`, `announcement`,
   `surface` (the solid-state background — `'canvas'` default · `'oat'` ·
@@ -258,14 +299,22 @@ a listener middleware (`features/cart/cartListener.js`, prepended in
   numbers come from the `Counter` model (`Counter.next(name)` — atomic,
   gap-free, one sequence per financial year).
   `POST /api/orders/admin/:id/bill` (admin) renders the PDF (`pdfkit`,
-  `server/src/utils/billOfSupply.js`), hosts it on Cloudinary (raw), stores
-  `billOfSupply` on the order, and advances `placed → accepted`. A Bill of
-  Supply is never re-issued. The PDF ("Nocturne" layout — dark night bands
-  framing the page, a crescent moon dotting the wordmark) paginates for
-  large orders: items flow across pages, continuation pages get a compact
-  header, the totals stay whole on the last page. Preview it without a live
-  order via `cd server && node preview-bill.mjs`. The customer's account
-  "Invoice" button links to the hosted PDF. The admin **Bills** page (`/admin/bills` →
+  `server/src/utils/billOfSupply.js`), uploads it to Cloudinary as a
+  **PRIVATE (`type:'authenticated'`) raw asset**, stores `billOfSupply`
+  (`{ number, publicId, url, issuedAt }`) on the order, advances
+  `placed → accepted`, and **emails the customer the PDF as an attachment**
+  (best-effort — see Email). A Bill of Supply is never re-issued. The PDF
+  ("Nocturne" layout — dark night bands framing the page, a crescent moon
+  dotting the wordmark) paginates for large orders. Preview it without a live
+  order via `cd server && node preview-bill.mjs`.
+- **Invoices are PRIVATE — never link the raw Cloudinary URL.** The PDF is an
+  authenticated asset (the plain URL 401s), served ONLY through
+  `GET /api/orders/:id/invoice` (`getInvoice`, behind `protect`): it checks
+  the requester is the order's **owner or an admin**, signs the URL
+  server-side, and streams the bytes. The account "Invoice" button and both
+  admin views point at this proxy (`${BASE_URL}/orders/:id/invoice`) — this
+  closes the old hole where sequential bill URLs were publicly enumerable. The
+  admin **Bills** page (`/admin/bills` →
   `GET /api/orders/admin/bills`) is the GST register: every Bill of Supply,
   filterable by issued-date range (3 year presets + custom), with count +
   turnover + 1% composition GST aggregated server-side over the whole range.
@@ -320,9 +369,28 @@ a listener middleware (`features/cart/cartListener.js`, prepended in
   (Delhivery drops the scan otherwise) — so one indexed (`trackingId`) lookup +
   save; idempotent. This is how `delivered` is reached automatically; the admin
   "Mark delivered" button stays as a fallback. Full spec: `DELHIVERY.md` §3.7a.
-- Not yet done: order-confirmation emails — planned to fire on the webhook
-  confirmation (best-effort, exactly once per order); blocked on buying the
-  store domain + an email provider. Tracked in `UPGRADES.md` → Order emails.
+- **Email (transactional)** → `server/src/utils/mailer.js` (nodemailer over
+  SMTP, env `SMTP_HOST/PORT/USER/PASS` + `EMAIL_FROM`, sends as
+  `support@nuit.in`). One shared `emailShell({eyebrow, body})` (warm oat card +
+  hosted-PNG wordmark logo). Built + LIVE-pending:
+  - **Email verification** (soft-gated): signup fires `sendVerificationEmail`
+    (best-effort — never blocks signup). Link is a purpose-scoped JWT
+    (`signEmailVerifyToken`/`readEmailVerifyToken`, 24h) → `/verify-email`
+    page → `POST /api/auth/verify-email` (token IS the proof, no session) flips
+    `user.emailVerified`. Resend via `POST /api/auth/resend-verification`
+    (protect). A soft banner nudges unverified users; nothing is blocked.
+  - **Invoice email**: `sendBillOfSupplyEmail` attaches the PDF (no link —
+    invoices are private). Fired best-effort after bill generation.
+  - **Link base** for emails: `PUBLIC_SITE_URL` (fall back to first
+    `CLIENT_URL`) — `CLIENT_URL` is a CORS list that may start with localhost,
+    so never build customer links off it.
+  - ⚠️ **DigitalOcean blocks outbound SMTP (25/465/587) by default.** Email
+    fails on the droplet (`ECONNREFUSED`/timeout) until either a DO support
+    ticket lifts it, OR we switch to an HTTP email API (Resend etc., port 443).
+    SMTP creds are correct (verified from a non-droplet host).
+- Not yet done: **order-confirmation** emails — fire on the webhook
+  confirmation (best-effort, exactly once per order). Tracked in
+  `UPGRADES.md` → Order emails. (Blocked on the SMTP situation above.)
 - **Fulfilment rule:** orders exist in the DB from `/orders/create` onward with
   `status: 'placed'` *before* payment. NEVER fulfil/ship on `status` — only on
   `paymentStatus === 'paid'`.

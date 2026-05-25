@@ -47,16 +47,26 @@ When an admin approves a return, call Razorpay's refunds API and handle the
 `refund.processed` webhook to reflect it on the order.
 
 ### Order emails [P2]
-No transactional email anywhere. **The plan:** on the Razorpay **webhook**
-confirmation, send the customer an order-received acknowledgment. Two rules
-when building it:
+**Email infra is now BUILT** — nodemailer over SMTP as `support@nuit.in`
+(`server/src/utils/mailer.js`), with **email verification** (soft-gated) and
+the **invoice email** (PDF attached) done. **Order-confirmation** email is the
+remaining piece — fire it on the Razorpay **webhook** confirmation:
 - Send it **inside the `paymentStatus !== 'paid'` idempotency guard** in
   `razorpayWebhook` — so it fires exactly once per order, never on retries.
-- Make the send **best-effort** — wrap it so a mail failure can NEVER fail
-  the webhook response, or Razorpay will retry the whole webhook.
+- Make the send **best-effort** — a mail failure must NEVER fail the webhook
+  response, or Razorpay will retry the whole webhook.
 Shipping-update emails (dispatched, etc.) come later, same provider.
-**Blocked:** needs an email provider + a sending domain — set up once the
-store domain is purchased.
+**⚠️ BLOCKER — DigitalOcean blocks outbound SMTP (25/465/587) on droplets.**
+Email fails in production (`ECONNREFUSED`/timeout) until either a DO support
+ticket lifts the restriction, OR we move to an HTTP email API (Resend etc.,
+port 443). Creds are correct (verified off-droplet). All email is dead in prod
+until this is resolved.
+
+### Invoice privacy — DONE
+Bills were public, sequentially-named Cloudinary URLs (enumerable PII leak).
+Fixed: PDFs upload as PRIVATE (`type:'authenticated'`); served only via the
+owner/admin-gated `GET /api/orders/:id/invoice` proxy. (Audit any other public
+Cloudinary assets similarly.)
 
 ### Order detail / history [P2]
 `/order/confirmed` reads the order from router state — a refresh loses it. Add

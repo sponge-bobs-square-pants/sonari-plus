@@ -1,7 +1,7 @@
 import Cart from '../models/Cart.js'
 
-/** A cart line is unique per product + colour + size. */
-const lineKey = (it) => `${it.productId}__${it.color}__${it.size}`
+/** A cart line is unique per product + colour + size + cup (cup = bras only). */
+const lineKey = (it) => `${it.productId}__${it.color}__${it.size}__${it.cup || ''}`
 
 /**
  * Normalise items coming from the client — the cart is user-supplied,
@@ -21,6 +21,7 @@ function cleanItems(items) {
       color: it.color || '',
       hex: it.hex || '',
       size: it.size,
+      cup: it.cup || '',
       price: Number(it.price) || 0,
       quantity: Math.max(1, parseInt(it.quantity, 10) || 1),
     }))

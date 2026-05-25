@@ -3,8 +3,8 @@
 # Variables
 IMAGE_NAME = nuit_backend
 CONTAINER_NAME = nuit_backend_container
-OLD_TAG = v0.0.1
-TAG = v0.0.2
+OLD_TAG = v0.0.2
+TAG = v0.0.3
 DOCKER_HUB_USERNAME = nuitdotin
 REMOTE_HOST = root@143.110.184.135
 PORT = 5174

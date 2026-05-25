@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { listProducts } from '../services/productApi'
-import { categories, sizesForCategory } from '../data/categories'
+import {
+  categories,
+  sizesForCategory,
+  cupsForCategory,
+} from '../data/categories'
 import Header from '../components/layout/Header'
 import ProductCard from '../components/product/ProductCard'
 import Reveal from '../components/ui/Reveal'
@@ -22,7 +26,9 @@ export default function ShopPage() {
     categories.find((c) => c.id === searchParams.get('category')) || null
   const activeCategoryId = activeCategory?.id ?? null
   const isKids = activeCategoryId === 'kids'
+  const isBras = activeCategoryId === 'bras'
   const sizeOptions = sizesForCategory(activeCategoryId)
+  const cupOptions = cupsForCategory(activeCategoryId) // null unless bras
 
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [sort, setSort] = useState('newest')
@@ -43,6 +49,7 @@ export default function ShopPage() {
 
   const activeCount =
     filters.sizes.length +
+    (isBras ? filters.cups.length : 0) +
     (filters.price !== 'all' ? 1 : 0) +
     (isKids && filters.gender !== 'all' ? 1 : 0)
 
@@ -57,6 +64,8 @@ export default function ShopPage() {
         limit: PAGE_SIZE,
         category: activeCategoryId ?? undefined,
         sizes: filters.sizes,
+        // cup filter only applies while browsing bras
+        cups: activeCategoryId === 'bras' ? filters.cups : undefined,
         priceMin: bucket?.min,
         priceMax: bucket?.max,
         sort,
@@ -217,6 +226,7 @@ export default function ShopPage() {
         resultCount={total}
         activeCount={activeCount}
         sizeOptions={sizeOptions}
+        cupOptions={cupOptions || []}
         showGender={isKids}
       />
     </>

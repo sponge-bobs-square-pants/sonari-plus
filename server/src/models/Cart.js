@@ -21,6 +21,7 @@ const cartItemSchema = new mongoose.Schema(
     color: { type: String, default: '' },
     hex: { type: String, default: '' },
     size: { type: String, default: '' },
+    cup: { type: String, default: '' }, // bra cup; empty otherwise
     price: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 1, default: 1 },
   },

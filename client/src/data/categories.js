@@ -6,6 +6,11 @@ import pantiesImage from '../assets/categories/v5/category-panties.png';
 // Size sets differ by category — apparel runs XS–XL, kids runs numeric.
 const APPAREL_SIZES = ['XS', 'S', 'M', 'L', 'XL'];
 const KIDS_SIZES = ['8', '10', '12', '14', '16'];
+// Bras are sized on two axes: band (the `sizes` list) × cup. The full
+// universe is offered; the admin toggles which band×cup combos a product
+// actually stocks.
+const BRA_BANDS = ['28', '30', '32', '34', '36', '38', '40', '42', '44'];
+const BRA_CUPS = ['A', 'B', 'C', 'D', 'DD', 'E', 'F', 'G'];
 
 /**
  * Site categories — the single source for the menu, the shop, the admin
@@ -40,7 +45,10 @@ export const categories = [
     id: 'bras',
     name: 'Bras',
     blurb: 'Soft-cup & wireless',
-    sizes: APPAREL_SIZES,
+    // Two-axis sizing: `sizes` is the band list, `cups` the cup list.
+    // A category having `cups` flags it as band×cup throughout the app.
+    sizes: BRA_BANDS,
+    cups: BRA_CUPS,
     image: brasImage,
     span: 'md:col-span-4',
     shadowEdge: 'no-bottom',
@@ -67,3 +75,15 @@ export const categories = [
 /** The size set for a category id — falls back to apparel sizes. */
 export const sizesForCategory = (id) =>
   categories.find((c) => c.id === id)?.sizes ?? APPAREL_SIZES;
+
+/** The cup set for a category id, or null if it isn't a two-axis category. */
+export const cupsForCategory = (id) =>
+  categories.find((c) => c.id === id)?.cups ?? null;
+
+/**
+ * How a chosen variant's size reads to a customer. Bras combine band + cup
+ * ('32' + 'B' → '32B'); everything else is just the size. `v` is anything
+ * with `{ size, cup }` — a variant, cart item, or order item.
+ */
+export const displaySize = (v) =>
+  v?.cup ? `${v.size}${v.cup}` : (v?.size ?? '');

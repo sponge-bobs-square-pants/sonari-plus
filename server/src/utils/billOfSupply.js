@@ -289,7 +289,9 @@ export function buildBillOfSupplyPdf(order, billNumber) {
     y = itemsHeader(y)
 
     order.items.forEach((it) => {
-      const variant = [it.color, it.size].filter(Boolean).join('   ·   ')
+      // Bras combine band + cup ('32' + 'B' → '32B'); others are just size.
+      const sizeLabel = it.cup ? `${it.size}${it.cup}` : it.size
+      const variant = [it.color, sizeLabel].filter(Boolean).join('   ·   ')
       const rowH = variant ? 36 : 28
       // New page when the next row would cross the safe limit.
       if (y + rowH > SAFE_BOTTOM) {

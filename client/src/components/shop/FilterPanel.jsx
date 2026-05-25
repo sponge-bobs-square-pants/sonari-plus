@@ -26,8 +26,8 @@ const SORTS = [
 ]
 
 // Category is decided by navigation (the URL), not by these filters.
-// `gender` only applies to the kids category.
-export const EMPTY_FILTERS = { sizes: [], price: 'all', gender: 'all' }
+// `gender` only applies to kids; `cups` only to bras (where `sizes` = bands).
+export const EMPTY_FILTERS = { sizes: [], cups: [], price: 'all', gender: 'all' }
 
 function FilterSection({ label, children }) {
   return (
@@ -76,8 +76,12 @@ export default function FilterPanel({
   resultCount,
   activeCount,
   sizeOptions = [],
+  cupOptions = [],
   showGender = false,
 }) {
+  // Bras are two-axis: `sizeOptions` is the band list and `cupOptions` adds
+  // a Cup section. Non-empty cupOptions = bras.
+  const bras = cupOptions.length > 0
   const [open, setOpen] = useState(false)
   const dockRef = useRef(null)
 
@@ -107,8 +111,17 @@ export default function FilterPanel({
         : [...filters.sizes, size],
     })
 
+  const toggleCup = (cup) =>
+    onChange({
+      ...filters,
+      cups: filters.cups.includes(cup)
+        ? filters.cups.filter((c) => c !== cup)
+        : [...filters.cups, cup],
+    })
+
   const hasActive =
     filters.sizes.length > 0 ||
+    filters.cups.length > 0 ||
     filters.price !== 'all' ||
     filters.gender !== 'all'
 
@@ -149,7 +162,7 @@ export default function FilterPanel({
               </FilterSection>
             )}
 
-            <FilterSection label="Size">
+            <FilterSection label={bras ? 'Band' : 'Size'}>
               <div className="flex flex-wrap gap-2">
                 {sizeOptions.map((s) => {
                   const on = filters.sizes.includes(s)
@@ -170,6 +183,30 @@ export default function FilterPanel({
                 })}
               </div>
             </FilterSection>
+
+            {bras && (
+              <FilterSection label="Cup">
+                <div className="flex flex-wrap gap-2">
+                  {cupOptions.map((c) => {
+                    const on = filters.cups.includes(c)
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => toggleCup(c)}
+                        className={`h-10 w-12 cursor-pointer border text-xs transition-colors ${
+                          on
+                            ? 'border-ink bg-ink text-canvas'
+                            : 'border-linen text-clay hover:border-ink'
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    )
+                  })}
+                </div>
+              </FilterSection>
+            )}
 
             <FilterSection label="Price">
               <div className="space-y-0.5">

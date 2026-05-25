@@ -54,7 +54,11 @@ async function reduceStockForOrder(order) {
       const product = await Product.findById(item.productId)
       if (!product) continue
       const color = product.colors.find((c) => c.name === item.color)
-      const variant = color?.sizes.find((s) => s.size === item.size)
+      // Match on BOTH axes — for bras two variants can share a band and
+      // differ only by cup, so size alone wouldn't identify one.
+      const variant = color?.sizes.find(
+        (s) => s.size === item.size && (s.cup || '') === (item.cup || ''),
+      )
       if (!variant) continue
       variant.stock = Math.max(0, variant.stock - item.quantity)
       await product.save()
@@ -99,11 +103,14 @@ export async function createOrder(req, res, next) {
       const product = productById[String(i.productId)]
       const variant = product?.colors
         .find((c) => c.name === i.color)
-        ?.sizes.find((s) => s.size === i.size)
+        ?.sizes.find(
+          (s) => s.size === i.size && (s.cup || '') === (i.cup || ''),
+        )
       const available = variant?.stock ?? 0
       if (available < i.quantity) {
+        const label = i.cup ? `${i.size}${i.cup}` : i.size
         return res.status(400).json({
-          message: `Only ${available} left of ${i.name} (${i.color} · ${i.size}). Please update your cart.`,
+          message: `Only ${available} left of ${i.name} (${i.color} · ${label}). Please update your cart.`,
         })
       }
     }
@@ -122,6 +129,7 @@ export async function createOrder(req, res, next) {
         color: i.color,
         hex: i.hex,
         size: i.size,
+        cup: i.cup || '',
         price: i.price,
         quantity: i.quantity,
       }

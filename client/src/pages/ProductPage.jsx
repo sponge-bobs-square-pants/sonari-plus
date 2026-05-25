@@ -17,9 +17,11 @@ export default function ProductPage() {
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [error, setError] = useState('')
 
-  // Variant selection
+  // Variant selection. For bras `size` holds the band and `cup` the cup;
+  // for everything else `cup` stays null.
   const [colorIndex, setColorIndex] = useState(0)
   const [size, setSize] = useState(null)
+  const [cup, setCup] = useState(null)
   const [qty, setQty] = useState(1)
   const [activeImage, setActiveImage] = useState(0)
   const [hint, setHint] = useState('')
@@ -41,6 +43,7 @@ export default function ProductPage() {
   // Changing colour resets the dependent selections.
   useEffect(() => {
     setSize(null)
+    setCup(null)
     setActiveImage(0)
     setQty(1)
     setHint('')
@@ -66,7 +69,20 @@ export default function ProductPage() {
   const color = colors[colorIndex]
   const gallery = (color?.images?.length ? color.images : product.images) || []
   const sizes = color?.sizes || []
-  const selectedVariant = sizes.find((s) => s.size === size)
+  // Bras are two-axis (band × cup): any variant carrying a cup flags it.
+  const isBra = sizes.some((s) => s.cup)
+  const selectedVariant = sizes.find(
+    (s) => s.size === size && (s.cup || '') === (cup || ''),
+  )
+  // Bra bands, in stored order (variants are saved band-then-cup); and the
+  // cups available for the chosen band.
+  const bands = isBra
+    ? sizes.reduce(
+        (acc, s) => (acc.includes(s.size) ? acc : [...acc, s.size]),
+        [],
+      )
+    : []
+  const cupsForBand = isBra ? sizes.filter((s) => s.size === size) : []
 
   const allPrices = colors.flatMap((c) => c.sizes.map((s) => s.price))
   const min = allPrices.length ? Math.min(...allPrices) : 0
@@ -78,12 +94,13 @@ export default function ProductPage() {
       : `${formatPrice(min)} – ${formatPrice(max)}`
 
   const handleAdd = () => {
-    if (!size) return setHint('Please select a size')
+    if (!size) return setHint(isBra ? 'Please select a band' : 'Please select a size')
+    if (isBra && !cup) return setHint('Please select a cup')
     if (!selectedVariant || selectedVariant.stock < 1) {
       return setHint('That size is out of stock')
     }
     // Don't let cart quantity exceed what's in stock for this variant.
-    const lineId = `${product._id}__${color.name}__${size}`
+    const lineId = `${product._id}__${color.name}__${size}__${cup || ''}`
     const inCart = cartItems.find((i) => i.lineId === lineId)?.quantity || 0
     if (inCart + qty > selectedVariant.stock) {
       return setHint(
@@ -104,6 +121,7 @@ export default function ProductPage() {
         color: color.name,
         hex: color.hex,
         size,
+        cup: cup || '',
         price: selectedVariant.price,
         quantity: qty,
       }),
@@ -202,45 +220,124 @@ export default function ProductPage() {
                   </div>
                 </div>
 
-                {/* Size */}
-                <div className="mt-7">
-                  <p className="eyebrow text-clay">Size</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {sizes.map((s) => {
-                      const oos = s.stock < 1
-                      const selected = s.size === size
-                      return (
-                        <button
-                          key={s.size}
-                          type="button"
-                          disabled={oos}
-                          onClick={() => {
-                            setSize(s.size)
-                            setHint('')
-                            setAdded(false)
-                            setQty(1)
-                          }}
-                          className={`h-11 min-w-11 px-3 border text-xs transition-colors ${
-                            selected
-                              ? 'border-ink bg-ink text-canvas'
-                              : oos
-                                ? 'cursor-not-allowed border-linen text-greige line-through'
-                                : 'border-ink/30 text-ink hover:border-ink'
-                          }`}
-                        >
-                          {s.size}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {selectedVariant &&
-                    selectedVariant.stock > 0 &&
-                    selectedVariant.stock <= 5 && (
-                      <p className="mt-2 text-xs text-dusk">
-                        Only {selectedVariant.stock} left
-                      </p>
+                {/* Size — bras pick band then cup; everything else one size */}
+                {isBra ? (
+                  <>
+                    <div className="mt-7">
+                      <p className="eyebrow text-clay">Band</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {bands.map((b) => {
+                          const inStock = sizes.some(
+                            (s) => s.size === b && s.stock > 0,
+                          )
+                          const selected = b === size
+                          return (
+                            <button
+                              key={b}
+                              type="button"
+                              disabled={!inStock}
+                              onClick={() => {
+                                setSize(b)
+                                setCup(null)
+                                setHint('')
+                                setAdded(false)
+                                setQty(1)
+                              }}
+                              className={`h-11 min-w-11 px-3 border text-xs transition-colors ${
+                                selected
+                                  ? 'border-ink bg-ink text-canvas'
+                                  : !inStock
+                                    ? 'cursor-not-allowed border-linen text-greige line-through'
+                                    : 'border-ink/30 text-ink hover:border-ink'
+                              }`}
+                            >
+                              {b}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    {size && (
+                      <div className="mt-6">
+                        <p className="eyebrow text-clay">Cup</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {cupsForBand.map((s) => {
+                            const oos = s.stock < 1
+                            const selected = s.cup === cup
+                            return (
+                              <button
+                                key={s.cup}
+                                type="button"
+                                disabled={oos}
+                                onClick={() => {
+                                  setCup(s.cup)
+                                  setHint('')
+                                  setAdded(false)
+                                  setQty(1)
+                                }}
+                                className={`h-11 min-w-11 px-3 border text-xs transition-colors ${
+                                  selected
+                                    ? 'border-ink bg-ink text-canvas'
+                                    : oos
+                                      ? 'cursor-not-allowed border-linen text-greige line-through'
+                                      : 'border-ink/30 text-ink hover:border-ink'
+                                }`}
+                              >
+                                {s.cup}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        {selectedVariant &&
+                          selectedVariant.stock > 0 &&
+                          selectedVariant.stock <= 5 && (
+                            <p className="mt-2 text-xs text-dusk">
+                              Only {selectedVariant.stock} left
+                            </p>
+                          )}
+                      </div>
                     )}
-                </div>
+                  </>
+                ) : (
+                  <div className="mt-7">
+                    <p className="eyebrow text-clay">Size</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {sizes.map((s) => {
+                        const oos = s.stock < 1
+                        const selected = s.size === size
+                        return (
+                          <button
+                            key={s.size}
+                            type="button"
+                            disabled={oos}
+                            onClick={() => {
+                              setSize(s.size)
+                              setHint('')
+                              setAdded(false)
+                              setQty(1)
+                            }}
+                            className={`h-11 min-w-11 px-3 border text-xs transition-colors ${
+                              selected
+                                ? 'border-ink bg-ink text-canvas'
+                                : oos
+                                  ? 'cursor-not-allowed border-linen text-greige line-through'
+                                  : 'border-ink/30 text-ink hover:border-ink'
+                            }`}
+                          >
+                            {s.size}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {selectedVariant &&
+                      selectedVariant.stock > 0 &&
+                      selectedVariant.stock <= 5 && (
+                        <p className="mt-2 text-xs text-dusk">
+                          Only {selectedVariant.stock} left
+                        </p>
+                      )}
+                  </div>
+                )}
 
                 {/* Quantity */}
                 <div className="mt-7">

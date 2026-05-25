@@ -10,6 +10,8 @@ const orderItemSchema = new mongoose.Schema(
     color: { type: String, default: '' },
     hex: { type: String, default: '' },
     size: { type: String, default: '' },
+    // Bra cup (band is `size`); empty for every other category.
+    cup: { type: String, default: '' },
     price: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 1 },
   },

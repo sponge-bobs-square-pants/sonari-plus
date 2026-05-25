@@ -55,6 +55,15 @@ export async function listProducts(req, res, next) {
       if (sizes.length) query['colors.sizes.size'] = { $in: sizes }
     }
 
+    // Bra cup filter — matches a product that has ANY variant in these cups.
+    if (req.query.cups) {
+      const cups = req.query.cups
+        .split(',')
+        .map((c) => c.trim())
+        .filter(Boolean)
+      if (cups.length) query['colors.sizes.cup'] = { $in: cups }
+    }
+
     const priceMin = Number(req.query.priceMin)
     const priceMax = Number(req.query.priceMax)
     if (Number.isFinite(priceMin)) {

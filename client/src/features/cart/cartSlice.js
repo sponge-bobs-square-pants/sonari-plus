@@ -10,11 +10,12 @@ const initialState = {
 }
 
 /**
- * A cart line is unique per product + colour + size — those three
- * together identify exactly one buyable variant. Two sizes of the
- * same product are two separate lines.
+ * A cart line is unique per product + colour + size + cup — together they
+ * identify exactly one buyable variant. (cup is bras-only; empty otherwise,
+ * so non-bra lines key exactly as before.)
  */
-const lineKey = (item) => `${item.productId}__${item.color}__${item.size}`
+const lineKey = (item) =>
+  `${item.productId}__${item.color}__${item.size}__${item.cup || ''}`
 
 const cartSlice = createSlice({
   name: 'cart',

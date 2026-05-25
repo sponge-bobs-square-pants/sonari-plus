@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   getProduct,
   createProduct,
   updateProduct,
 } from '../../services/productApi'
-import { categories, sizesForCategory } from '../../data/categories'
+import {
+  categories,
+  sizesForCategory,
+  cupsForCategory,
+} from '../../data/categories'
 import { BRAND } from '../../data/brand'
 import TextField from '../../components/ui/TextField'
 import Button from '../../components/ui/Button'
@@ -37,22 +41,30 @@ const variantInput =
   'focus:border-canvas focus:outline-none'
 
 /* ── One colour variant: name, swatch, sized/priced rows, images ──
-   `sizeOptions` is the size set for the product's category. */
-function ColorBlock({ color, index, sizeOptions, onChange, onRemove }) {
-  const sizeEntry = (size) => color.sizes.find((s) => s.size === size)
+   `sizeOptions` is the category's size set (the band list for bras).
+   `cupOptions` is the cup list for bras, or null for every other category —
+   its presence switches the variant editor to a band × cup grid. */
+function ColorBlock({ color, index, sizeOptions, cupOptions, onChange, onRemove }) {
+  const bras = Boolean(cupOptions)
 
-  const toggleSize = (size) => {
-    const next = sizeEntry(size)
-      ? color.sizes.filter((s) => s.size !== size)
-      : [...color.sizes, { size, price: 0, stock: 0 }]
+  // A variant is identified by (size, cup). cup is '' for non-bra categories.
+  const variantAt = (size, cup = '') =>
+    color.sizes.find((s) => s.size === size && (s.cup || '') === cup)
+
+  const toggleVariant = (size, cup = '') => {
+    const next = variantAt(size, cup)
+      ? color.sizes.filter((s) => !(s.size === size && (s.cup || '') === cup))
+      : [...color.sizes, { size, cup, price: 0, stock: 0 }]
     onChange(index, { ...color, sizes: next })
   }
 
-  const setSizeField = (size, field, value) => {
+  const setVariantField = (size, cup, field, value) => {
     onChange(index, {
       ...color,
       sizes: color.sizes.map((s) =>
-        s.size === size ? { ...s, [field]: Number(value) || 0 } : s,
+        s.size === size && (s.cup || '') === cup
+          ? { ...s, [field]: Number(value) || 0 }
+          : s,
       ),
     })
   }
@@ -60,6 +72,15 @@ function ColorBlock({ color, index, sizeOptions, onChange, onRemove }) {
   const subtotal = color.sizes.reduce(
     (sum, s) => sum + (Number(s.stock) || 0),
     0,
+  )
+
+  // Selected variants, ordered band-then-cup, for the price/stock list.
+  const sorted = [...color.sizes].sort(
+    (a, b) =>
+      sizeOptions.indexOf(a.size) - sizeOptions.indexOf(b.size) ||
+      (bras
+        ? cupOptions.indexOf(a.cup || '') - cupOptions.indexOf(b.cup || '')
+        : 0),
   )
 
   return (
@@ -90,35 +111,76 @@ function ColorBlock({ color, index, sizeOptions, onChange, onRemove }) {
 
       <div className="mt-4">
         <span className="eyebrow text-[0.5625rem] text-canvas/40">
-          Sizes · price · stock
+          {bras ? 'Band × cup — tap to stock' : 'Sizes · price · stock'}
         </span>
-        <div className="mt-2 space-y-2">
-          {sizeOptions.map((size) => {
-            const entry = sizeEntry(size)
-            const on = Boolean(entry)
-            return (
-              <div key={size} className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => toggleSize(size)}
-                  className={`h-9 w-12 shrink-0 cursor-pointer border text-xs transition-colors ${
-                    on
-                      ? 'border-canvas bg-canvas text-ink'
-                      : 'border-canvas/25 text-canvas/60 hover:border-canvas'
-                  }`}
-                >
-                  {size}
-                </button>
-                {on && (
-                  <>
+
+        {bras ? (
+          <>
+            {/* band (rows) × cup (columns) toggle grid */}
+            <div className="mt-2 overflow-x-auto">
+              <div
+                className="inline-grid gap-1"
+                style={{
+                  gridTemplateColumns: `2rem repeat(${cupOptions.length}, 1.9rem)`,
+                }}
+              >
+                <span />
+                {cupOptions.map((cup) => (
+                  <span
+                    key={cup}
+                    className="pb-1 text-center text-[0.625rem] text-canvas/40"
+                  >
+                    {cup}
+                  </span>
+                ))}
+                {sizeOptions.map((band) => (
+                  <Fragment key={band}>
+                    <span className="self-center pr-1 text-right text-[0.6875rem] text-canvas/50">
+                      {band}
+                    </span>
+                    {cupOptions.map((cup) => {
+                      const on = Boolean(variantAt(band, cup))
+                      return (
+                        <button
+                          key={cup}
+                          type="button"
+                          aria-label={`${band}${cup}`}
+                          onClick={() => toggleVariant(band, cup)}
+                          className={`flex h-[1.9rem] w-[1.9rem] cursor-pointer items-center justify-center border text-[0.625rem] transition-colors ${
+                            on
+                              ? 'border-canvas bg-canvas text-ink'
+                              : 'border-canvas/20 text-canvas/40 hover:border-canvas/60'
+                          }`}
+                        >
+                          {on ? '●' : ''}
+                        </button>
+                      )
+                    })}
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+
+            {/* price + stock for each stocked band+cup */}
+            {sorted.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {sorted.map((s) => (
+                  <div
+                    key={`${s.size}-${s.cup}`}
+                    className="flex items-center gap-3"
+                  >
+                    <span className="w-10 shrink-0 text-xs text-canvas">
+                      {s.size}
+                      {s.cup}
+                    </span>
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-canvas/40">₹</span>
                       <input
                         type="number"
                         min="0"
-                        value={entry.price}
+                        value={s.price}
                         onChange={(e) =>
-                          setSizeField(size, 'price', e.target.value)
+                          setVariantField(s.size, s.cup || '', 'price', e.target.value)
                         }
                         className={variantInput}
                       />
@@ -126,19 +188,68 @@ function ColorBlock({ color, index, sizeOptions, onChange, onRemove }) {
                     <input
                       type="number"
                       min="0"
-                      value={entry.stock}
+                      value={s.stock}
                       onChange={(e) =>
-                        setSizeField(size, 'stock', e.target.value)
+                        setVariantField(s.size, s.cup || '', 'stock', e.target.value)
                       }
                       className={variantInput}
                     />
                     <span className="text-xs text-canvas/40">in stock</span>
-                  </>
-                )}
+                  </div>
+                ))}
               </div>
-            )
-          })}
-        </div>
+            )}
+          </>
+        ) : (
+          <div className="mt-2 space-y-2">
+            {sizeOptions.map((size) => {
+              const entry = variantAt(size)
+              const on = Boolean(entry)
+              return (
+                <div key={size} className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleVariant(size)}
+                    className={`h-9 w-12 shrink-0 cursor-pointer border text-xs transition-colors ${
+                      on
+                        ? 'border-canvas bg-canvas text-ink'
+                        : 'border-canvas/25 text-canvas/60 hover:border-canvas'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                  {on && (
+                    <>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-canvas/40">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={entry.price}
+                          onChange={(e) =>
+                            setVariantField(size, '', 'price', e.target.value)
+                          }
+                          className={variantInput}
+                        />
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={entry.stock}
+                        onChange={(e) =>
+                          setVariantField(size, '', 'stock', e.target.value)
+                        }
+                        className={variantInput}
+                      />
+                      <span className="text-xs text-canvas/40">in stock</span>
+                    </>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         <p className="mt-2 text-xs text-canvas/45">
           {subtotal} in stock for this colour
         </p>
@@ -200,8 +311,10 @@ export default function AdminProductForm() {
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }))
   const update = (e) => set(e.target.name, e.target.value)
 
-  // Size set follows the chosen category (apparel XS–XL vs kids 8–16).
+  // Size set follows the chosen category (apparel XS–XL vs kids 8–16, or
+  // the band list for bras). `cupOptions` is non-null only for bras.
   const sizeOptions = sizesForCategory(form.category)
+  const cupOptions = cupsForCategory(form.category)
 
   /* ── Colours (each owns its variants and images) ── */
   const addColor = () =>
@@ -242,12 +355,16 @@ export default function AdminProductForm() {
             sizes: [...c.sizes]
               .map((s) => ({
                 size: s.size,
+                cup: s.cup || '', // '' for non-bras
                 price: Number(s.price) || 0,
                 stock: Number(s.stock) || 0,
               }))
               .sort(
                 (a, b) =>
-                  sizeOptions.indexOf(a.size) - sizeOptions.indexOf(b.size),
+                  sizeOptions.indexOf(a.size) - sizeOptions.indexOf(b.size) ||
+                  (cupOptions
+                    ? cupOptions.indexOf(a.cup) - cupOptions.indexOf(b.cup)
+                    : 0),
               ),
           })),
       }
@@ -423,6 +540,7 @@ export default function AdminProductForm() {
                 color={c}
                 index={i}
                 sizeOptions={sizeOptions}
+                cupOptions={cupOptions}
                 onChange={setColorAt}
                 onRemove={removeColor}
               />

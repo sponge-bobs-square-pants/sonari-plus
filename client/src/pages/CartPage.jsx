@@ -8,6 +8,7 @@ import {
   updateQuantity,
 } from '../features/cart/cartSlice'
 import { getProduct } from '../services/productApi'
+import { displaySize } from '../data/categories'
 import Header from '../components/layout/Header'
 import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
@@ -79,7 +80,7 @@ function CartCard({ item, cover, stock, onQty, onRemove }) {
           </Link>
         </h3>
         <p className="mt-1 text-xs text-clay">
-          {[item.color, item.size].filter(Boolean).join(' · ')}
+          {[item.color, displaySize(item)].filter(Boolean).join(' · ')}
         </p>
         <p className="mt-1.5 font-display text-sm font-light text-ink">
           {formatPrice(item.price * item.quantity)}

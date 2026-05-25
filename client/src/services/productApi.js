@@ -11,13 +11,24 @@ import { api } from './apiClient'
  * @returns {Promise<{ products, page, totalPages, total, hasMore }>}
  */
 export const listProducts = (params = {}) => {
-  const { page, limit, category, sizes, priceMin, priceMax, sort, tag, search } =
-    params
+  const {
+    page,
+    limit,
+    category,
+    sizes,
+    cups,
+    priceMin,
+    priceMax,
+    sort,
+    tag,
+    search,
+  } = params
   const qs = new URLSearchParams()
   if (page) qs.set('page', page)
   if (limit) qs.set('limit', limit)
   if (category) qs.set('category', category)
   if (sizes?.length) qs.set('sizes', sizes.join(','))
+  if (cups?.length) qs.set('cups', cups.join(','))
   if (priceMin != null) qs.set('priceMin', priceMin)
   if (priceMax != null) qs.set('priceMax', priceMax)
   if (sort) qs.set('sort', sort)

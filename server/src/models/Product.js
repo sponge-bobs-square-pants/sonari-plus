@@ -11,6 +11,10 @@ export const CATEGORIES = ['nightwear', 'nightdresses', 'bras', 'panties', 'kids
 const variantSchema = new mongoose.Schema(
   {
     size: { type: String, required: true, trim: true },
+    // Second sizing axis — used ONLY by bras: the band is `size` (e.g. '32'),
+    // the cup is here (e.g. 'B'). Empty for every other category, so their
+    // variant identity stays exactly (colour, size) and nothing changes.
+    cup: { type: String, default: '', trim: true },
     price: {
       type: Number,
       required: [true, 'Price is required'],
@@ -126,6 +130,7 @@ productSchema.index({ createdAt: -1 })
 productSchema.index({ priceFrom: 1 })
 productSchema.index({ tag: 1 })
 productSchema.index({ 'colors.sizes.size': 1 })
+productSchema.index({ 'colors.sizes.cup': 1 }) // bra cup filtering
 
 // Include virtuals in API responses; drop the internal version key.
 productSchema.set('toJSON', {

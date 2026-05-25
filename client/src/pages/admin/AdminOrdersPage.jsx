@@ -10,6 +10,7 @@ import {
   markDeliveryFailed,
 } from '../../services/orderApi'
 import { BASE_URL } from '../../services/apiClient'
+import { displaySize } from '../../data/categories'
 import AdminPageShell from '../../components/admin/AdminPageShell'
 import Icon from '../../components/ui/Icon'
 import { formatPrice } from '../../utils/format'
@@ -593,7 +594,7 @@ function OrderDetail({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm text-canvas">{item.name}</p>
               <p className="mt-0.5 text-xs text-canvas/45">
-                {[item.color, item.size].filter(Boolean).join(' · ')}
+                {[item.color, displaySize(item)].filter(Boolean).join(' · ')}
               </p>
             </div>
             <p className="shrink-0 text-xs text-canvas/45">
