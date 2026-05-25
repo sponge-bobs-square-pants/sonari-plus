@@ -28,7 +28,7 @@ export const categories = [
   },
   {
     id: 'nightdresses',
-    name: 'Night suits',
+    name: 'Night wear',
     blurb: 'Long, short & between',
     sizes: APPAREL_SIZES,
     image: nightdressesImage,

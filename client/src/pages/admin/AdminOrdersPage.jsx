@@ -9,6 +9,7 @@ import {
   markDelivered,
   markDeliveryFailed,
 } from '../../services/orderApi'
+import { BASE_URL } from '../../services/apiClient'
 import AdminPageShell from '../../components/admin/AdminPageShell'
 import Icon from '../../components/ui/Icon'
 import { formatPrice } from '../../utils/format'
@@ -639,7 +640,7 @@ function OrderDetail({
               </p>
             </div>
             <a
-              href={order.billOfSupply.url}
+              href={`${BASE_URL}/orders/${order._id}/invoice`}
               target="_blank"
               rel="noopener noreferrer"
               className="eyebrow rounded-full border border-canvas/30 px-4 py-2 text-canvas/70 transition-colors hover:border-canvas hover:text-canvas"

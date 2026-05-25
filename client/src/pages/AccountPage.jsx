@@ -8,7 +8,9 @@ import {
 } from '../features/auth/authSlice'
 import { listOrders } from '../services/orderApi'
 import { deleteAddress } from '../services/userApi'
+import { BASE_URL } from '../services/apiClient'
 import Header from '../components/layout/Header'
+import VerifyEmailBanner from '../components/VerifyEmailBanner'
 import Icon from '../components/ui/Icon'
 import Button from '../components/ui/Button'
 import Placeholder from '../components/ui/Placeholder'
@@ -350,10 +352,10 @@ function OrderDetailPanel({ order, cols, sideBySide, tracking, onTrack, onClose 
 
         {/* Actions — Invoice + Track (Track opens the timeline panel) */}
         <div className="mt-7 flex gap-3">
-          {order.billOfSupply?.url ? (
+          {order.billOfSupply?.number ? (
             <Button
               as="a"
-              href={order.billOfSupply.url}
+              href={`${BASE_URL}/orders/${order._id}/invoice`}
               target="_blank"
               rel="noopener noreferrer"
               variant="outline"
@@ -617,6 +619,9 @@ export default function AccountPage() {
 
       <main className="min-h-screen bg-canvas px-6 pb-24 pt-28">
         <div className="mx-auto max-w-5xl">
+          {/* Soft nudge — only shows for unverified accounts */}
+          <VerifyEmailBanner />
+
           {/* Tabs — log out aligned to the right of the same line */}
           <div className="flex items-end justify-between gap-6 border-b border-linen">
             <nav className="flex gap-8">

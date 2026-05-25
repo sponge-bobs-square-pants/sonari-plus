@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listBills } from '../../services/orderApi'
+import { BASE_URL } from '../../services/apiClient'
 import AdminPageShell from '../../components/admin/AdminPageShell'
 import { formatPrice } from '../../utils/format'
 
@@ -227,7 +228,7 @@ export default function AdminBillsPage() {
                   {formatPrice(b.total)}
                 </div>
                 <a
-                  href={b.billOfSupply.url}
+                  href={`${BASE_URL}/orders/${b._id}/invoice`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="eyebrow shrink-0 text-canvas/55 transition-colors hover:text-canvas"
