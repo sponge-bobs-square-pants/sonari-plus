@@ -11,6 +11,7 @@ import {
   RAZORPAY_WEBHOOK_SECRET,
 } from '../config/razorpay.js'
 import { financialYear, buildBillOfSupplyPdf } from '../utils/billOfSupply.js'
+import { sendBillOfSupplyEmail } from '../utils/mailer.js'
 import {
   createShipment,
   schedulePickup,
@@ -406,31 +407,91 @@ export async function generateBillOfSupply(req, res, next) {
     const seq = await Counter.next(`bos-${fy}`)
     const number = `BS/${fy}/${String(seq).padStart(4, '0')}`
 
-    // Render → host on Cloudinary as a raw asset.
+    // Render → host on Cloudinary as a PRIVATE (authenticated) raw asset.
+    // `type: 'authenticated'` means the plain URL is NOT publicly reachable —
+    // it requires a signature, so invoices can't be enumerated/leaked. We
+    // deliver it only through the owner-gated /invoice proxy below.
     const pdf = await buildBillOfSupplyPdf(order, number)
-    const url = await new Promise((resolve, reject) => {
+    const uploaded = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'sonari/bills',
           resource_type: 'raw',
+          type: 'authenticated',
           // The `.pdf` MUST be part of the public_id — for `raw` assets
-          // Cloudinary treats the public_id literally and appends nothing,
-          // so without it the delivered URL has no extension and the
-          // browser serves it as octet-stream (a file that isn't a .pdf).
+          // Cloudinary treats the public_id literally and appends nothing.
           public_id: `${number.replace(/\//g, '-')}.pdf`,
         },
-        (err, result) => (err ? reject(err) : resolve(result.secure_url)),
+        (err, result) => (err ? reject(err) : resolve(result)),
       )
       stream.end(pdf)
     })
 
-    order.billOfSupply = { number, url, issuedAt: new Date() }
+    order.billOfSupply = {
+      number,
+      publicId: uploaded.public_id,
+      url: uploaded.secure_url,
+      issuedAt: new Date(),
+    }
     if (order.status === 'placed') order.status = 'accepted'
     await order.save()
+
+    // Email the customer their invoice (PDF attached) — best-effort. The bill
+    // is already saved, so a mail failure must not fail the request.
+    sendBillOfSupplyEmail(order, pdf).catch((err) =>
+      console.error('[bill] invoice email failed:', err.message),
+    )
 
     res.json({ order })
   } catch (err) {
     console.error('[bill] generation failed:', err.message)
+    next(err)
+  }
+}
+
+/**
+ * GET /api/orders/:id/invoice — stream the Bill of Supply PDF.
+ *
+ * The PDF lives on Cloudinary as a PRIVATE (authenticated) asset, so it is
+ * NOT publicly reachable. Access is gated HERE by session: only the order's
+ * owner or an admin may fetch it. We sign a URL server-side, fetch the bytes,
+ * and stream them — the Cloudinary URL never reaches the browser.
+ */
+export async function getInvoice(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id)
+    if (!order) return res.status(404).json({ message: 'Order not found.' })
+
+    const isOwner = order.user.toString() === req.user._id.toString()
+    if (!isOwner && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not allowed.' })
+    }
+
+    const bill = order.billOfSupply
+    if (!bill?.publicId) {
+      return res.status(404).json({ message: 'No invoice for this order yet.' })
+    }
+
+    // Sign the private asset's URL with our secret (stays server-side).
+    const signed = cloudinary.url(bill.publicId, {
+      resource_type: 'raw',
+      type: 'authenticated',
+      sign_url: true,
+      secure: true,
+    })
+    const upstream = await fetch(signed)
+    if (!upstream.ok) {
+      return res.status(502).json({ message: 'Could not retrieve the invoice.' })
+    }
+
+    const buf = Buffer.from(await upstream.arrayBuffer())
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="nuit-invoice-${bill.number.replace(/\//g, '-')}.pdf"`,
+    )
+    res.send(buf)
+  } catch (err) {
     next(err)
   }
 }

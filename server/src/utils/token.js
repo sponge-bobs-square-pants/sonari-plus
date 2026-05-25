@@ -17,6 +17,29 @@ export function signToken(user) {
 }
 
 /**
+ * Sign a short-lived, single-purpose token for the email-verification link.
+ * `purpose` is checked on the way back so a session token can't be replayed
+ * as a verify token (or vice-versa). Stateless — nothing stored server-side.
+ */
+export function signEmailVerifyToken(user) {
+  return jwt.sign(
+    { id: user._id, purpose: 'verify-email' },
+    process.env.JWT_SECRET,
+    { expiresIn: '1d' },
+  )
+}
+
+/** Verify an email-verification token; returns the user id, or null if bad. */
+export function readEmailVerifyToken(token) {
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET)
+    return payload.purpose === 'verify-email' ? payload.id : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Cookie options for the auth token.
  *  - httpOnly: JavaScript (and therefore XSS) cannot read it
  *  - secure:   HTTPS-only in production; off for local http dev

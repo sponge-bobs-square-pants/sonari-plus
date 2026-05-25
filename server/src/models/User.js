@@ -41,6 +41,10 @@ const userSchema = new mongoose.Schema(
     },
     // Delivery addresses the customer has chosen to save.
     addresses: { type: [addressSchema], default: [] },
+
+    // Has the customer confirmed their email via the verification link?
+    // Soft-gated: unverified users can still use the site (we just nudge).
+    emailVerified: { type: Boolean, default: false },
   },
   { timestamps: true },
 )

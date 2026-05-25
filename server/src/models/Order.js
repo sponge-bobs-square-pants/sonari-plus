@@ -53,7 +53,13 @@ const verificationSchema = new mongoose.Schema(
 const billOfSupplySchema = new mongoose.Schema(
   {
     number: { type: String }, // e.g. 'BS/2025-26/0001'
-    url: { type: String }, // hosted PDF (Cloudinary)
+    // Cloudinary public_id of the PRIVATE (authenticated) PDF. The invoice
+    // is never publicly reachable — it's streamed only through the
+    // owner/admin-gated GET /api/orders/:id/invoice proxy, which signs a
+    // short-lived URL server-side. `url` is the (signature-required) hosted
+    // address, kept for reference; it is NOT a public link.
+    publicId: { type: String },
+    url: { type: String },
     issuedAt: { type: Date },
   },
   { _id: false },

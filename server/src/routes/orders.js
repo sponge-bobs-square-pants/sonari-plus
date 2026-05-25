@@ -13,6 +13,7 @@ import {
   getOrderLabel,
   markOrderDelivered,
   markDeliveryFailed,
+  getInvoice,
   listBills,
   razorpayWebhook,
   delhiveryWebhook,
@@ -32,6 +33,8 @@ router.use(protect)
 router.post('/create', createOrder)
 router.post('/verify', verifyPayment)
 router.get('/', listMyOrders)
+// Owner-or-admin gated invoice stream (the auth check lives in the controller).
+router.get('/:id/invoice', getInvoice)
 
 // Admin only — order management.
 router.get('/admin', requireAdmin, listAllOrders)
