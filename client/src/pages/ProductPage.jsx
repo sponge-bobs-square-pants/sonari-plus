@@ -1,15 +1,50 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { getProduct } from '../services/productApi'
 import { addItem, selectCartItems } from '../features/cart/cartSlice'
-import { formatPrice } from '../utils/format'
+import {
+  formatPrice,
+  effectivePrice,
+  isDiscounted,
+  discountPercent,
+} from '../utils/format'
+import { productPath, productIdFromSlug } from '../utils/slug'
+import { useDocumentMeta } from '../utils/useDocumentMeta'
+import { categories } from '../data/categories'
+
+/** Lookup the customer-facing category name from its id (or empty). */
+const categoryName = (id) => categories.find((c) => c.id === id)?.name || ''
+
+/**
+ * SEO description for a product page — aimed at the 120–155 char sweet
+ * spot Google uses for SERP snippets. Prefers the merchandiser's own
+ * description (trimmed at a word boundary); falls back to a template
+ * using name, company and category so every product has a meaningful
+ * meta description even when the admin hasn't written one.
+ */
+function buildProductDescription(product) {
+  const intro = product.description?.trim()
+  if (intro && intro.length >= 60) {
+    if (intro.length <= 155) return intro
+    return intro.slice(0, 155).replace(/\s+\S*$/, '') + '…'
+  }
+  const cat = categoryName(product.category).toLowerCase()
+  const company = product.company ? ` by ${product.company}` : ''
+  const piece = cat ? ` ${cat}` : ''
+  return `Shop ${product.name}${company} — soft, considered${piece} at nuit. Free delivery on Indian orders over ₹2,000.`
+}
 import Header from '../components/layout/Header'
 import Button from '../components/ui/Button'
 import Placeholder from '../components/ui/Placeholder'
 
 export default function ProductPage() {
-  const { id } = useParams()
+  // The route param is `slug` — either a rich "name-id" slug or, for old
+  // bookmarks/email links, a bare 24-hex ObjectId. Either way the ID is the
+  // trailing 24 hex chars, which is what we actually fetch by.
+  const { slug } = useParams()
+  const id = productIdFromSlug(slug)
+  const navigate = useNavigate()
   const dispatch = useDispatch()
   const cartItems = useSelector(selectCartItems)
 
@@ -28,17 +63,79 @@ export default function ProductPage() {
   const [added, setAdded] = useState(false)
 
   useEffect(() => {
+    // No 24-hex tail in the URL → no real product to load. Render error.
+    if (!id) {
+      setError('Product not found.')
+      setStatus('error')
+      return
+    }
     setStatus('loading')
     getProduct(id)
       .then((p) => {
         setProduct(p)
         setStatus('ready')
+        // Canonicalise the URL: if the visitor arrived on a bare ID or a
+        // stale slug, rewrite the address bar to the slugged form. We
+        // `replace` rather than push so the browser back button doesn't
+        // land on the old URL, and so Google treats the slugged URL as
+        // canonical when it executes the page's JS.
+        const canonical = productPath(p)
+        if (canonical !== `/product/${slug}`) {
+          navigate(canonical, { replace: true })
+        }
       })
       .catch((err) => {
         setError(err.message)
         setStatus('error')
       })
-  }, [id])
+  }, [id, slug, navigate])
+
+  /**
+   * Per-product <title>, <meta description> and matching OG/Twitter
+   * tags. Googlebot executes JS and reads these for SERP titles +
+   * snippets, so a customer searching "long cotton nightdress" sees a
+   * useful, product-specific title in the result. Empty until the
+   * product loads (the index.html defaults are still in place).
+   */
+  const productCover =
+    product?.images?.[0] || product?.colors?.[0]?.images?.[0] || ''
+  useDocumentMeta({
+    title: product
+      ? `${product.name}${product.company ? ` — ${product.company}` : ''} | nuit`
+      : undefined,
+    description: product ? buildProductDescription(product) : undefined,
+    url: product
+      ? `${window.location.origin}${productPath(product)}`
+      : undefined,
+    image: productCover || undefined,
+  })
+
+  /**
+   * Set a <link rel="canonical"> in the document head pointing at the
+   * slugged URL — derived from the LOADED product (not the URL the
+   * customer arrived on), so a bare-id arrival still advertises the
+   * slugged form as canonical. This is the strongest SEO signal for
+   * consolidating link equity onto one URL; Google reads it even
+   * without executing the JS-driven replaceState above.
+   *
+   * Cleaned up on unmount so navigating to another page doesn't leave
+   * this product's URL hanging as the canonical for the next page.
+   */
+  useEffect(() => {
+    if (!product) return undefined
+    const canonicalUrl = `${window.location.origin}${productPath(product)}`
+    let link = document.querySelector('link[rel="canonical"]')
+    const created = !link
+    if (!link) {
+      link = document.createElement('link')
+      link.rel = 'canonical'
+      document.head.appendChild(link)
+    }
+    link.href = canonicalUrl
+    return () => {
+      if (created && link.parentNode) link.parentNode.removeChild(link)
+    }
+  }, [product])
 
   // Changing colour resets the dependent selections.
   useEffect(() => {
@@ -84,14 +181,21 @@ export default function ProductPage() {
     : []
   const cupsForBand = isBra ? sizes.filter((s) => s.size === size) : []
 
-  const allPrices = colors.flatMap((c) => c.sizes.map((s) => s.price))
-  const min = allPrices.length ? Math.min(...allPrices) : 0
-  const max = allPrices.length ? Math.max(...allPrices) : 0
+  const allVariants = colors.flatMap((c) => c.sizes)
+  const effectives = allVariants.map((v) => effectivePrice(v))
+  const min = effectives.length ? Math.min(...effectives) : 0
+  const max = effectives.length ? Math.max(...effectives) : 0
+  // The "headline" — what is currently charged for the chosen variant, or
+  // the effective range when nothing's chosen.
   const priceDisplay = selectedVariant
-    ? formatPrice(selectedVariant.price)
+    ? formatPrice(effectivePrice(selectedVariant))
     : min === max
       ? formatPrice(min)
       : `${formatPrice(min)} – ${formatPrice(max)}`
+  // MRP + Save% surface only once the customer has picked a variant — the
+  // header range stays clean before that.
+  const showStrike = selectedVariant && isDiscounted(selectedVariant)
+  const savePercent = showStrike ? discountPercent(selectedVariant) : 0
 
   const handleAdd = () => {
     if (!size) return setHint(isBra ? 'Please select a band' : 'Please select a size')
@@ -122,7 +226,9 @@ export default function ProductPage() {
         hex: color.hex,
         size,
         cup: cup || '',
-        price: selectedVariant.price,
+        // Charge the effective price; carry the MRP only when discounted.
+        price: effectivePrice(selectedVariant),
+        mrp: isDiscounted(selectedVariant) ? selectedVariant.price : null,
         quantity: qty,
       }),
     )
@@ -180,7 +286,19 @@ export default function ProductPage() {
             <h1 className="mt-2 font-display text-3xl font-light tracking-tight text-ink md:text-4xl">
               {product.name}
             </h1>
-            <p className="mt-4 text-lg text-ink">{priceDisplay}</p>
+            <div className="mt-4 flex flex-wrap items-baseline gap-3">
+              <p className="text-lg text-ink">{priceDisplay}</p>
+              {showStrike && (
+                <>
+                  <p className="text-sm text-greige line-through">
+                    {formatPrice(selectedVariant.price)}
+                  </p>
+                  <p className="eyebrow text-xs text-dusk">
+                    Save {savePercent}%
+                  </p>
+                </>
+              )}
+            </div>
 
             {product.description && (
               <p className="mt-6 text-sm leading-relaxed text-clay">

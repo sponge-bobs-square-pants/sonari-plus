@@ -12,7 +12,13 @@ const orderItemSchema = new mongoose.Schema(
     size: { type: String, default: '' },
     // Bra cup (band is `size`); empty for every other category.
     cup: { type: String, default: '' },
+    // `price` is what the customer was actually charged for one unit;
+    // `mrp` is the MRP (the un-discounted price) at the time of purchase.
+    // When `mrp > price` the customer saved (mrp - price) per unit — that's
+    // what gets shown struck-through on the invoice and the order detail.
+    // Null `mrp` (or `mrp <= price`) means there was no discount.
     price: { type: Number, required: true, min: 0 },
+    mrp: { type: Number, default: null, min: 0 },
     quantity: { type: Number, required: true, min: 1 },
   },
   { _id: false },

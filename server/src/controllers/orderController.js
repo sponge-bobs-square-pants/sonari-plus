@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import Order from '../models/Order.js'
 import Cart from '../models/Cart.js'
-import Product from '../models/Product.js'
+import Product, { effectiveVariantPrice } from '../models/Product.js'
 import Counter from '../models/Counter.js'
 import cloudinary from '../config/cloudinary.js'
 import {
@@ -117,6 +117,17 @@ export async function createOrder(req, res, next) {
 
     const items = cart.items.map((i) => {
       const product = productById[String(i.productId)]
+      // Look up the LIVE variant — the cart snapshot's price is informational
+      // only; the server decides what's charged. This is also where a stale
+      // cart catches up to a fresh discount (or a discount that ended).
+      const variant = product?.colors
+        .find((c) => c.name === i.color)
+        ?.sizes.find(
+          (s) => s.size === i.size && (s.cup || '') === (i.cup || ''),
+        )
+      const price = variant ? effectiveVariantPrice(variant) : i.price
+      // Stamp the MRP onto the order ONLY when this is a real discount.
+      const mrp = variant && variant.price > price ? variant.price : null
       // current cover (the shop-grid photo); fall back to the cart
       // snapshot if the product has since been removed.
       const cover =
@@ -130,7 +141,8 @@ export async function createOrder(req, res, next) {
         hex: i.hex,
         size: i.size,
         cup: i.cup || '',
-        price: i.price,
+        price,
+        mrp,
         quantity: i.quantity,
       }
     })

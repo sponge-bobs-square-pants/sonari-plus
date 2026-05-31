@@ -47,8 +47,15 @@ export default function OrderConfirmationPage() {
                         {item.name}
                         <span className="text-clay"> × {item.quantity}</span>
                       </span>
-                      <span className="shrink-0 text-ink">
-                        {formatPrice(item.price * item.quantity)}
+                      <span className="shrink-0 text-right">
+                        <span className="block text-ink">
+                          {formatPrice(item.price * item.quantity)}
+                        </span>
+                        {item.mrp != null && item.mrp > item.price && (
+                          <span className="block text-[0.625rem] text-greige line-through">
+                            {formatPrice(item.mrp * item.quantity)}
+                          </span>
+                        )}
                       </span>
                     </li>
                   ))}

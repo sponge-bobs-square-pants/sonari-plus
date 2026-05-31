@@ -292,7 +292,10 @@ export function buildBillOfSupplyPdf(order, billNumber) {
       // Bras combine band + cup ('32' + 'B' → '32B'); others are just size.
       const sizeLabel = it.cup ? `${it.size}${it.cup}` : it.size
       const variant = [it.color, sizeLabel].filter(Boolean).join('   ·   ')
-      const rowH = variant ? 36 : 28
+      // When the line was sold at a discount, the row grows enough to
+      // carry a small struck-through MRP beneath the Rate.
+      const hasMrp = it.mrp != null && it.mrp > it.price
+      const rowH = (variant ? 36 : 28) + (hasMrp ? 10 : 0)
       // New page when the next row would cross the safe limit.
       if (y + rowH > SAFE_BOTTOM) {
         doc.addPage()
@@ -318,6 +321,19 @@ export function buildBillOfSupplyPdf(order, billNumber) {
         width: 70,
         align: 'right',
       })
+      if (hasMrp) {
+        // MRP struck-through beneath the Rate — establishes the discount
+        // explicitly on the invoice itself.
+        doc
+          .font('Helvetica')
+          .fontSize(7.5)
+          .fillColor(C.greige)
+          .text(amount(it.mrp), rateR - 70, y + 14, {
+            width: 70,
+            align: 'right',
+            strike: true,
+          })
+      }
       doc
         .font('Helvetica-Bold')
         .fontSize(10.5)

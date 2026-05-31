@@ -22,7 +22,11 @@ const cartItemSchema = new mongoose.Schema(
     hex: { type: String, default: '' },
     size: { type: String, default: '' },
     cup: { type: String, default: '' }, // bra cup; empty otherwise
+    // `price` is the (potentially discounted) charge per unit at add-to-bag
+    // time; `mrp` is the un-discounted price for the struck-through display.
+    // Snapshots — re-validated against the live Product at checkout.
     price: { type: Number, required: true, min: 0 },
+    mrp: { type: Number, default: null, min: 0 },
     quantity: { type: Number, required: true, min: 1, default: 1 },
   },
   { _id: false },

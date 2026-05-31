@@ -21,16 +21,31 @@ const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
-    // payload: { productId, name, company, image, color, hex, size, price, quantity }
+    // payload: { productId, name, company, image, color, hex, size, cup,
+    //   price, mrp, quantity }
+    // `price` is the (potentially discounted) charge per unit; `mrp` is the
+    // un-discounted MRP for the struck-through display — null when there's
+    // no discount. ProductPage normalises this so non-discounted lines
+    // arrive here with mrp: null.
     addItem: (state, action) => {
       const item = action.payload
       const lineId = lineKey(item)
       const existing = state.items.find((i) => i.lineId === lineId)
       if (existing) {
-        // Same variant already in the bag — just add to its quantity.
+        // Same variant already in the bag — just add to its quantity. We
+        // also refresh price/mrp from the new payload so adding a second
+        // unit while the merchandiser just launched a discount picks up
+        // the new pricing without forcing the user to clear their bag.
         existing.quantity += item.quantity || 1
+        existing.price = item.price
+        existing.mrp = item.mrp ?? null
       } else {
-        state.items.push({ ...item, lineId, quantity: item.quantity || 1 })
+        state.items.push({
+          ...item,
+          mrp: item.mrp ?? null,
+          lineId,
+          quantity: item.quantity || 1,
+        })
       }
     },
 

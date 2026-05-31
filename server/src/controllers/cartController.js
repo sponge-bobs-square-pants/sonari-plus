@@ -12,19 +12,28 @@ function cleanItems(items) {
   if (!Array.isArray(items)) return []
   return items
     .filter((it) => it && it.productId && it.size)
-    .map((it) => ({
-      lineId: it.lineId || lineKey(it),
-      productId: it.productId,
-      name: it.name || '',
-      company: it.company || '',
-      image: it.image || '',
-      color: it.color || '',
-      hex: it.hex || '',
-      size: it.size,
-      cup: it.cup || '',
-      price: Number(it.price) || 0,
-      quantity: Math.max(1, parseInt(it.quantity, 10) || 1),
-    }))
+    .map((it) => {
+      // Carry the MRP snapshot through ONLY when it's a real discount
+      // (mrp > price). Otherwise normalise to null so the UI never shows
+      // a struck-through line that equals the active price.
+      const price = Number(it.price) || 0
+      const rawMrp = Number(it.mrp)
+      const mrp = Number.isFinite(rawMrp) && rawMrp > price ? rawMrp : null
+      return {
+        lineId: it.lineId || lineKey(it),
+        productId: it.productId,
+        name: it.name || '',
+        company: it.company || '',
+        image: it.image || '',
+        color: it.color || '',
+        hex: it.hex || '',
+        size: it.size,
+        cup: it.cup || '',
+        price,
+        mrp,
+        quantity: Math.max(1, parseInt(it.quantity, 10) || 1),
+      }
+    })
 }
 
 /** GET /api/cart — the signed-in user's cart. */

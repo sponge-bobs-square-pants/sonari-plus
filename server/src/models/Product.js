@@ -20,10 +20,31 @@ const variantSchema = new mongoose.Schema(
       required: [true, 'Price is required'],
       min: [0, 'Price cannot be negative'],
     },
+    // Optional sale price. When set and strictly less than `price`, this is
+    // what the customer is charged and what the storefront shows next to a
+    // struck-through `price` (which then reads as MRP). Null/0/>=price all
+    // mean "no discount" — the effective price is `price`.
+    discountedPrice: {
+      type: Number,
+      default: null,
+      min: [0, 'Discounted price cannot be negative'],
+    },
     stock: { type: Number, default: 0, min: [0, 'Stock cannot be negative'] },
   },
   { _id: false },
 )
+
+/**
+ * What the customer is actually charged for a variant — the discount if
+ * one is set AND below the MRP, otherwise the MRP itself. This is the
+ * single function every part of the money path (price display, priceFrom,
+ * cart/order snapshots) reads, so the rule lives in one place.
+ */
+export function effectiveVariantPrice(variant) {
+  const dp = variant?.discountedPrice
+  if (dp != null && dp > 0 && dp < variant.price) return dp
+  return variant?.price ?? 0
+}
 
 /** A colour variant — its own sizes, and optionally its own images. */
 const colorSchema = new mongoose.Schema(
@@ -96,9 +117,15 @@ productSchema.virtual('totalStock').get(function () {
   return allVariants(this).reduce((sum, v) => sum + (v.stock || 0), 0)
 })
 
-/** Cheapest variant price across the whole colour × size grid. */
+/**
+ * Cheapest EFFECTIVE variant price across the whole colour × size grid —
+ * a discounted variant lowers `priceFrom`, so it sorts and filters by what
+ * the customer would actually pay (not by its MRP).
+ */
 function lowestPrice(colors = []) {
-  const prices = colors.flatMap((c) => (c.sizes || []).map((s) => s.price))
+  const prices = colors.flatMap((c) =>
+    (c.sizes || []).map((s) => effectiveVariantPrice(s)),
+  )
   return prices.length ? Math.min(...prices) : 0
 }
 

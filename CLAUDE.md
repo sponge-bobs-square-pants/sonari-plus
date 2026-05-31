@@ -115,7 +115,7 @@ brainstorm; the exploration screens are the design references:
   `protect` + `requireAdmin` middleware. Client: `RequireAuth` / `RequireAdmin`
   route guards + `features/auth/authSlice.js`. `apiClient` sends `credentials:'include'`.
 - **Product model** → `server/src/models/Product.js`: `company` · `colors` →
-  `sizes` → `{ size, cup, price, stock }` · `images` · `featuredImage` (a
+  `sizes` → `{ size, cup, price, discountedPrice, stock }` · `images` · `featuredImage` (a
   dedicated "New this week" cover) · `gender` (`'' | 'boy' | 'girl'` — only set
   for the `kids` category). A variant is identified by `(size, cup)`; `cup` is
   empty for every category EXCEPT bras (where `size` is the band, `cup` the
@@ -124,12 +124,26 @@ brainstorm; the exploration screens are the design references:
   sorted or range-filtered in Mongo, and `/shop` needs both. Kept in sync by
   `pre('save')` + `pre('findOneAndUpdate')` hooks — never set it by hand.
   Existing rows: `cd server && npm run backfill:price` (one-off).
+- **Discounts are per-variant.** `discountedPrice` (optional, must be
+  `0 < dp < price` to count) lives next to `price` on each variant —
+  matches the existing per-(size, cup) pricing so bras can discount
+  a single band×cup if needed. The single source for "what's the customer
+  actually charged?" is `effectiveVariantPrice(v)` (server,
+  `server/src/models/Product.js`; mirrored client-side as `effectivePrice`
+  in `client/src/utils/format.js`). `priceFrom` denormalises the min
+  EFFECTIVE price, so discounted products sort and range-filter by what
+  the customer would pay (not by MRP). On the money path the order/cart
+  item snapshots carry both `price` (charged) AND `mrp` (the un-discounted
+  MRP, null when not discounted) — so invoices and order history can
+  always show "MRP ₹X" struck through next to what was paid. The admin
+  form's bulk-apply prompt (`Apply sale price to all →`) stamps the same
+  discount across every variant in a colour; per-variant overrides remain.
 - **Image uploads**: `POST /api/upload` (admin only) → Cloudinary. The browser
   never sees the Cloudinary secret — uploads proxy through Express.
 - Redux store: `cart` + `auth` slices (`client/src/app/store.js`).
 - Categories are fixed site structure (`client/src/data/categories.js`), not
   data. Five of them: Cordset · Night wear · Bras · Panties · Kids. Each
-  carries a `sizes` array (apparel = XS–XL, Kids = 8–16) — the single source
+  carries a `sizes` array (apparel = XS–6XL, Kids = 4–16 + 20–34) — the single source
   for the admin form's size toggles and the filter. A category with no `span`
   (Kids) is shown in the menu/shop but is NOT a homepage gallery tile.
 - **Bras are TWO-AXIS (band × cup).** The bras category also carries a `cups`
@@ -162,6 +176,98 @@ brainstorm; the exploration screens are the design references:
   pages stay reachable site-wide through the menu instead: `MenuOverlay`'s
   secondary links include Privacy / Terms / Refund.
 
+## Product URLs
+
+Product pages live at **`/product/<slug>-<24-hex-id>`** (e.g.
+`/product/long-cotton-nightdress-68a4f9b2abc1234567890def`). The slug is
+derived on the fly from `product.name` — there is no `slug` field in
+the DB, so a name edit changes the URL automatically. The 24-hex
+ObjectId at the tail is the canonical lookup; anything before it is
+SEO decoration.
+
+- **Generate links** with `productPath(obj)` from `client/src/utils/slug.js`.
+  Pass a Product, a cart-line snapshot ({productId, name}), or any object
+  with `_id` (or `productId`) + `name` — never build the path by hand.
+- **Decode** with `productIdFromSlug(slug)` — pulls the trailing 24 hex
+  chars. Old bare `/product/<id>` URLs still resolve because the regex
+  matches the whole string as the ID, so bookmarks and old shared links
+  keep working.
+- **Canonical redirect**: `ProductPage` calls
+  `navigate(productPath(p), { replace: true })` after load if the URL
+  isn't already the canonical form. Search engines consolidate signals
+  on the slugged form; old bookmarks update their address bar on visit.
+- The dynamic sitemap (`server/src/routes/sitemap.js`) and the
+  build-time generator (`client/scripts/generate-sitemap.js`) both
+  duplicate the `slugify()` rule so they have no client-side import
+  dependency. **Three copies — keep them in step**: any rule change
+  needs touching `client/src/utils/slug.js`,
+  `server/src/routes/sitemap.js`, AND
+  `client/scripts/generate-sitemap.js`.
+
+## Page metadata (titles, descriptions, OG cards)
+
+- **Defaults** — `client/index.html`. Brand-level `<title>`,
+  `<meta name="description">`, plus a full Open Graph + Twitter Card
+  set so any URL pasted into WhatsApp / Facebook / LinkedIn renders as
+  a proper "nuit" card instead of a bare link. Update these any time
+  the brand tagline changes.
+- **Per-page overrides** — `client/src/utils/useDocumentMeta.js`. A
+  React hook that updates `<title>` + `description` + the matching OG
+  and Twitter content on mount, and restores the previous values on
+  unmount. Googlebot executes JS and reads the overridden values, so
+  per-page titles flow into Google search results.
+- **ProductPage uses it** to publish a product-specific title
+  (`{name} — {company} | nuit`) and description (the merchandiser's
+  copy trimmed to ~155 chars, falling back to a templated description
+  if blank). The OG image is set to the product's cover photo so any
+  JS-aware preview also looks product-specific.
+- **Still future** — per-product **social card** previews (the
+  non-JS Facebook / WhatsApp scraper case) need SSR or prerendering;
+  any shared product URL inherits the brand-level OG card until then.
+
+## SEO surfaces
+
+- **`robots.txt`** — `client/public/robots.txt`. Allows the catalogue and
+  content pages; disallows private flows (`/account` · `/admin` · `/cart` ·
+  `/checkout` · `/order/` · `/verify-email`) so crawl budget goes to
+  product/category pages. Points at `https://www.nuit.in/sitemap.xml`.
+- **Sitemap (build-time generated)** — `client/scripts/generate-sitemap.js`,
+  wired as `postbuild` in `client/package.json`. Runs after `vite build`,
+  fetches every product from the production API (`backend.nuit.in/api/products`,
+  paginated), and writes a fresh `dist/sitemap.xml` listing all static
+  routes + every product as a slugged URL (`/product/<slug>-<id>`).
+  Each frontend `make build-deploy` captures the catalogue as of build
+  time — new products show up in Google within hours of the next deploy.
+  If the API fetch fails (network glitch / backend down), the script
+  logs a warning and leaves the **`client/public/sitemap.xml`** static
+  fallback in place — Vite copied it to `dist/` earlier in the build,
+  so the image still ships with a valid (marketing-only) sitemap. Keep
+  `public/sitemap.xml` around for that reason.
+- **Dynamic sitemap (server)** — `server/src/routes/sitemap.js`,
+  mounted at the ROOT of the backend (not `/api/*` — Google fetches
+  "well-known" paths). Lists the same routes + products, fresh on
+  every request, cached 5 min. Reach it at
+  `https://backend.nuit.in/sitemap.xml`. This is the **real-time**
+  upgrade: when frontend deploys aren't frequent enough to pick up new
+  products, add this `location` block to the `www.nuit.in` host nginx
+  vhost (BEFORE the catch-all `/`) and `systemctl reload nginx` —
+  `www.nuit.in/sitemap.xml` then serves the live backend version and
+  the postbuild's snapshot becomes a fallback-of-a-fallback:
+
+  ```
+  location = /sitemap.xml {
+      proxy_pass http://127.0.0.1:5174/sitemap.xml;
+      proxy_set_header Host $host;
+  }
+  ```
+
+  With that proxy in place, the dynamic version wins over the static
+  fallback and product URLs flow through automatically. Cached 5 min.
+- **Google Search Console** — verify both `www.nuit.in` and
+  `backend.nuit.in` (TXT record on `nuit.in` covers both subdomains in
+  one shot). Submit `https://www.nuit.in/sitemap.xml`; GSC re-fetches it
+  daily so any new product appears in the next crawl.
+
 ## Roles
 
 - `user` → `/account` — Purchases · Favourites · My details (horizontal tabs;
@@ -183,7 +289,8 @@ brainstorm; the exploration screens are the design references:
 
 Landing page · auth (login / signup) · account area · admin panel (product CRUD
 with Cloudinary image uploads, variant model) · single product page
-(`/product/:id`) with colour/size selection + add-to-cart.
+(`/product/:slug` — see "Product URLs" below) with colour/size selection +
+add-to-cart.
 
 Content pages: `/about` (the brand story — nuit is a curated multi-brand
 store, NOT a manufacturer) and `/contact` (a front-end-only message form +

@@ -54,18 +54,49 @@ function ColorBlock({ color, index, sizeOptions, cupOptions, onChange, onRemove 
   const toggleVariant = (size, cup = '') => {
     const next = variantAt(size, cup)
       ? color.sizes.filter((s) => !(s.size === size && (s.cup || '') === cup))
-      : [...color.sizes, { size, cup, price: 0, stock: 0 }]
+      : [
+          ...color.sizes,
+          { size, cup, price: 0, discountedPrice: null, stock: 0 },
+        ]
     onChange(index, { ...color, sizes: next })
   }
 
+  // The discountedPrice input is a plain text box, so an empty value should
+  // reset it to null (= "no discount") — only positive numbers count.
   const setVariantField = (size, cup, field, value) => {
+    const numeric =
+      field === 'discountedPrice'
+        ? value === '' || Number(value) <= 0
+          ? null
+          : Number(value)
+        : Number(value) || 0
     onChange(index, {
       ...color,
       sizes: color.sizes.map((s) =>
         s.size === size && (s.cup || '') === cup
-          ? { ...s, [field]: Number(value) || 0 }
+          ? { ...s, [field]: numeric }
           : s,
       ),
+    })
+  }
+
+  // Bulk-apply: take the lowest non-zero price across this colour's
+  // stocked variants and a fixed discounted price, and stamp the discount
+  // on every variant. Cheaper UX than per-variant entry for the common
+  // case (whole-colour sale).
+  const applyBulkDiscount = () => {
+    const stocked = color.sizes
+    if (stocked.length === 0) return
+    const ans = window.prompt(
+      'Discounted price (₹) to apply to every size in this colour. Empty or 0 clears the discount.',
+      '',
+    )
+    if (ans === null) return // cancelled
+    const dp = Number(ans)
+    const next = dp > 0 ? dp : null
+    onChange(index, {
+      ...color,
+      sizes: color.sizes.map((s) => ({ ...s, discountedPrice: next })),
     })
   }
 
@@ -161,13 +192,13 @@ function ColorBlock({ color, index, sizeOptions, cupOptions, onChange, onRemove 
               </div>
             </div>
 
-            {/* price + stock for each stocked band+cup */}
+            {/* price + discount + stock for each stocked band+cup */}
             {sorted.length > 0 && (
               <div className="mt-4 space-y-2">
                 {sorted.map((s) => (
                   <div
                     key={`${s.size}-${s.cup}`}
-                    className="flex items-center gap-3"
+                    className="flex flex-wrap items-center gap-3"
                   >
                     <span className="w-10 shrink-0 text-xs text-canvas">
                       {s.size}
@@ -185,6 +216,26 @@ function ColorBlock({ color, index, sizeOptions, cupOptions, onChange, onRemove 
                         className={variantInput}
                       />
                     </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="eyebrow text-[0.5625rem] text-dusk">
+                        Sale ₹
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={s.discountedPrice ?? ''}
+                        placeholder="—"
+                        onChange={(e) =>
+                          setVariantField(
+                            s.size,
+                            s.cup || '',
+                            'discountedPrice',
+                            e.target.value,
+                          )
+                        }
+                        className={variantInput}
+                      />
+                    </div>
                     <input
                       type="number"
                       min="0"
@@ -197,6 +248,13 @@ function ColorBlock({ color, index, sizeOptions, cupOptions, onChange, onRemove 
                     <span className="text-xs text-canvas/40">in stock</span>
                   </div>
                 ))}
+                <button
+                  type="button"
+                  onClick={applyBulkDiscount}
+                  className="eyebrow text-[0.5625rem] text-dusk transition-colors hover:text-canvas"
+                >
+                  Apply sale price to all →
+                </button>
               </div>
             )}
           </>
@@ -206,7 +264,10 @@ function ColorBlock({ color, index, sizeOptions, cupOptions, onChange, onRemove 
               const entry = variantAt(size)
               const on = Boolean(entry)
               return (
-                <div key={size} className="flex items-center gap-3">
+                <div
+                  key={size}
+                  className="flex flex-wrap items-center gap-3"
+                >
                   <button
                     type="button"
                     onClick={() => toggleVariant(size)}
@@ -232,6 +293,26 @@ function ColorBlock({ color, index, sizeOptions, cupOptions, onChange, onRemove 
                           className={variantInput}
                         />
                       </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="eyebrow text-[0.5625rem] text-dusk">
+                          Sale ₹
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={entry.discountedPrice ?? ''}
+                          placeholder="—"
+                          onChange={(e) =>
+                            setVariantField(
+                              size,
+                              '',
+                              'discountedPrice',
+                              e.target.value,
+                            )
+                          }
+                          className={variantInput}
+                        />
+                      </div>
                       <input
                         type="number"
                         min="0"
@@ -247,6 +328,15 @@ function ColorBlock({ color, index, sizeOptions, cupOptions, onChange, onRemove 
                 </div>
               )
             })}
+            {color.sizes.length > 0 && (
+              <button
+                type="button"
+                onClick={applyBulkDiscount}
+                className="eyebrow text-[0.5625rem] text-dusk transition-colors hover:text-canvas"
+              >
+                Apply sale price to all →
+              </button>
+            )}
           </div>
         )}
 
@@ -353,12 +443,21 @@ export default function AdminProductForm() {
             hex: c.hex,
             images: c.images || [],
             sizes: [...c.sizes]
-              .map((s) => ({
-                size: s.size,
-                cup: s.cup || '', // '' for non-bras
-                price: Number(s.price) || 0,
-                stock: Number(s.stock) || 0,
-              }))
+              .map((s) => {
+                const price = Number(s.price) || 0
+                // Only persist a real, active discount (>0 and < MRP).
+                // Otherwise null — the schema treats null as "no discount".
+                const dp = Number(s.discountedPrice)
+                const discountedPrice =
+                  Number.isFinite(dp) && dp > 0 && dp < price ? dp : null
+                return {
+                  size: s.size,
+                  cup: s.cup || '', // '' for non-bras
+                  price,
+                  discountedPrice,
+                  stock: Number(s.stock) || 0,
+                }
+              })
               .sort(
                 (a, b) =>
                   sizeOptions.indexOf(a.size) - sizeOptions.indexOf(b.size) ||

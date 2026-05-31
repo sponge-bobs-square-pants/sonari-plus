@@ -61,6 +61,18 @@ function AdminProductCard({ product, onDelete }) {
         </h3>
         <p className="mt-1 text-sm text-canvas/55">
           from {formatPrice(product.priceFrom)}
+          {product.colors?.some((c) =>
+            c.sizes?.some(
+              (s) =>
+                s.discountedPrice != null &&
+                s.discountedPrice > 0 &&
+                s.discountedPrice < s.price,
+            ),
+          ) && (
+            <span className="eyebrow ml-2 text-[0.5625rem] text-dusk">
+              Sale
+            </span>
+          )}
         </p>
         <p className="mt-0.5 text-xs text-canvas/40">
           {product.totalStock} in stock

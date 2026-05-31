@@ -597,8 +597,13 @@ function OrderDetail({
                 {[item.color, displaySize(item)].filter(Boolean).join(' · ')}
               </p>
             </div>
-            <p className="shrink-0 text-xs text-canvas/45">
+            <p className="shrink-0 text-right text-xs text-canvas/45">
               {item.quantity} × {formatPrice(item.price)}
+              {item.mrp != null && item.mrp > item.price && (
+                <span className="ml-1 text-canvas/30 line-through">
+                  {formatPrice(item.mrp)}
+                </span>
+              )}
             </p>
             <p className="w-20 shrink-0 text-right text-sm text-canvas">
               {formatPrice(item.price * item.quantity)}

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import Placeholder from '../ui/Placeholder'
-import { formatPrice } from '../../utils/format'
+import { formatPrice, effectivePrice, isDiscounted } from '../../utils/format'
+import { productPath } from '../../utils/slug'
 
 /**
  * Storefront product card — renders a product from the API.
@@ -21,18 +22,29 @@ export default function ProductCard({ product, featured = false }) {
     null
 
   // Price: variants can differ — "from ₹X" when they do, flat "₹X" when not.
-  const prices =
-    product.colors?.flatMap((c) => c.sizes.map((s) => s.price)) || []
-  const min = prices.length ? Math.min(...prices) : (product.priceFrom ?? 0)
-  const max = prices.length ? Math.max(...prices) : min
+  // With discounts we display the EFFECTIVE price (what's charged) and the
+  // MRP of the same-cheapest variant struck-through alongside it, mirroring
+  // how every Indian e-commerce site signals a sale.
+  const allVariants = product.colors?.flatMap((c) => c.sizes) || []
+  const effective = allVariants.map((v) => effectivePrice(v))
+  const minEffective = effective.length
+    ? Math.min(...effective)
+    : (product.priceFrom ?? 0)
+  const maxEffective = effective.length ? Math.max(...effective) : minEffective
+  const cheapest = allVariants.find(
+    (v) => effectivePrice(v) === minEffective,
+  )
+  const showStrike = cheapest && isDiscounted(cheapest)
   const priceLabel =
-    min === max ? formatPrice(min) : `from ${formatPrice(min)}`
+    minEffective === maxEffective
+      ? formatPrice(minEffective)
+      : `from ${formatPrice(minEffective)}`
 
   const zoom =
     'transition-transform duration-[900ms] ease-[cubic-bezier(0.22,0.61,0.36,1)] group-hover:scale-[1.05]'
 
   return (
-    <Link to={`/product/${product._id}`} className="group block">
+    <Link to={productPath(product)} className="group block">
       <div className="overflow-hidden bg-linen">
         {cover ? (
           <img
@@ -55,7 +67,14 @@ export default function ProductCard({ product, featured = false }) {
         <h3 className="mt-1.5 font-display text-base font-normal text-ink">
           {product.name}
         </h3>
-        <p className="mt-1 text-sm text-clay">{priceLabel}</p>
+        <p className="mt-1 text-sm text-clay">
+          {priceLabel}
+          {showStrike && (
+            <span className="ml-2 text-xs text-greige line-through">
+              {formatPrice(cheapest.price)}
+            </span>
+          )}
+        </p>
       </div>
     </Link>
   )

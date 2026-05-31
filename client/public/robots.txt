@@ -1,0 +1,18 @@
+# nuit — https://www.nuit.in
+# We welcome search engines on the catalogue and the content pages.
+# Private flows (account, cart, checkout, admin, verification links)
+# carry no value to search results, so they are excluded — both to keep
+# them out of the index and to save the crawler's quota for product pages.
+
+User-agent: *
+Allow: /
+Disallow: /account
+Disallow: /account/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /cart
+Disallow: /checkout
+Disallow: /order/
+Disallow: /verify-email
+
+Sitemap: https://www.nuit.in/sitemap.xml

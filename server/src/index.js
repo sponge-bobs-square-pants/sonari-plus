@@ -9,6 +9,7 @@ import uploadRoutes from './routes/upload.js'
 import cartRoutes from './routes/cart.js'
 import orderRoutes from './routes/orders.js'
 import userRoutes from './routes/users.js'
+import sitemapRoute from './routes/sitemap.js'
 import { notFound, errorHandler } from './middleware/error.js'
 
 const app = express()
@@ -44,6 +45,11 @@ app.use('/api/upload', uploadRoutes)
 app.use('/api/cart', cartRoutes)
 app.use('/api/orders', orderRoutes)
 app.use('/api/users', userRoutes)
+
+// Crawler-facing — mounted at root because Google fetches /sitemap.xml.
+// Reach it directly at backend.nuit.in/sitemap.xml, or proxy it onto the
+// storefront domain via an nginx location block (see CLAUDE.md → SEO).
+app.use(sitemapRoute)
 
 app.use(notFound)
 app.use(errorHandler)

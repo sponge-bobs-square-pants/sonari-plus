@@ -14,6 +14,7 @@ import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
 import Placeholder from '../components/ui/Placeholder'
 import { formatPrice } from '../utils/format'
+import { productPath } from '../utils/slug'
 import { FREE_DELIVERY_THRESHOLD } from '../data/shipping'
 
 /* ── Quantity stepper ─────────────────────────────
@@ -54,7 +55,7 @@ function CartCard({ item, cover, stock, onQty, onRemove }) {
   return (
     <li className="flex w-[8.5rem] flex-col">
       <Link
-        to={`/product/${item.productId}`}
+        to={productPath(item)}
         className="block aspect-[3/4] w-full overflow-hidden bg-linen"
       >
         {cover ? (
@@ -73,7 +74,7 @@ function CartCard({ item, cover, stock, onQty, onRemove }) {
         {/* One line — overflow clips to an ellipsis. */}
         <h3 className="truncate font-display text-sm font-normal text-ink">
           <Link
-            to={`/product/${item.productId}`}
+            to={productPath(item)}
             className="transition-colors hover:text-clay"
           >
             {item.name}
@@ -85,6 +86,11 @@ function CartCard({ item, cover, stock, onQty, onRemove }) {
         <p className="mt-1.5 font-display text-sm font-light text-ink">
           {formatPrice(item.price * item.quantity)}
         </p>
+        {item.mrp != null && item.mrp > item.price && (
+          <p className="text-[0.625rem] text-greige line-through">
+            {formatPrice(item.mrp * item.quantity)}
+          </p>
+        )}
 
         {/* Delete first, then quantity — one line */}
         <div className="mt-1.5 flex items-center justify-between gap-2">

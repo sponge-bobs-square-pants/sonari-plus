@@ -8,6 +8,35 @@
       name="description"
       content="nuit Nightwear — modal and cotton sleepwear, nightdresses and intimates, made for how you actually sleep."
     />
+
+    <!--
+      Open Graph + Twitter defaults — what social crawlers (WhatsApp,
+      Facebook, LinkedIn, Twitter) read for link-share previews. These
+      don't execute JS, so per-page overrides only work with SSR. Until
+      then, every shared nuit URL inherits these brand-level defaults
+      and renders as a proper card instead of a bare link.
+
+      Googlebot DOES execute JS and reads document.title +
+      meta[name=description] AFTER hydration, so per-page overrides in
+      the useDocumentMeta() hook (client/src/utils/useDocumentMeta.js)
+      flow into search results correctly.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="nuit" />
+    <meta property="og:title" content="nuit Nightwear — Softness, by design" />
+    <meta
+      property="og:description"
+      content="nuit Nightwear — modal and cotton sleepwear, nightdresses and intimates, made for how you actually sleep."
+    />
+    <meta property="og:url" content="https://www.nuit.in/" />
+    <meta property="og:locale" content="en_IN" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="nuit Nightwear — Softness, by design" />
+    <meta
+      name="twitter:description"
+      content="nuit Nightwear — modal and cotton sleepwear, nightdresses and intimates, made for how you actually sleep."
+    />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
