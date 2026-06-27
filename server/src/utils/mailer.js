@@ -2,13 +2,24 @@ import nodemailer from 'nodemailer';
 import { signEmailVerifyToken } from './token.js';
 
 /**
- * SMTP transport, built once from env (GoDaddy / support@nuit.in).
- * Port 465 → implicit TLS (`secure: true`); 587 → STARTTLS (`secure: false`).
+ * SMTP transport, built once from env.
+ * - Port 465 → implicit TLS (`secure: true`).
+ * - 587 / 2525 → STARTTLS (`secure: false`) — 2525 is the "DigitalOcean-
+ *   friendly" alternate port many providers expose because DO's droplets
+ *   block outbound 25 / 465 / 587 by default.
+ * - SMTP_SECURE explicitly overrides the port heuristic when set
+ *   ('true' / 'false') — useful for non-standard ports.
  */
+const PORT = Number(process.env.SMTP_PORT) || 465;
+const SECURE =
+  process.env.SMTP_SECURE != null
+    ? process.env.SMTP_SECURE.toLowerCase() === 'true'
+    : PORT === 465;
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT) || 465,
-  secure: Number(process.env.SMTP_PORT) === 465,
+  port: PORT,
+  secure: SECURE,
   auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
 });
 
