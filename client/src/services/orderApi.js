@@ -15,6 +15,16 @@ export const createOrder = (shippingAddress, saveAddress = false) =>
 export const verifyPayment = (payload) =>
   api.post('/orders/verify', payload).then((d) => d.order)
 
+/**
+ * Poll-style verify used by the PhonePe redirect flow: PhonePe can
+ * redirect the browser back before the COMPLETED state has propagated,
+ * so the response may be `{ status: 'pending', orderId }` (HTTP 202) —
+ * the caller retries. On 200 it resolves to `{ order }` (paid); on 400+
+ * the apiClient throws, which the caller treats as final failure.
+ */
+export const pollOrderVerify = (orderId) =>
+  api.post('/orders/verify', { orderId })
+
 /** The signed-in user's paid orders, newest first. */
 export const listOrders = () => api.get('/orders').then((d) => d.orders)
 

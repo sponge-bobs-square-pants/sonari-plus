@@ -16,6 +16,7 @@ import {
   getInvoice,
   listBills,
   razorpayWebhook,
+  phonepeWebhook,
   delhiveryWebhook,
 } from '../controllers/orderController.js'
 import { protect, requireAdmin } from '../middleware/auth.js'
@@ -24,7 +25,9 @@ const router = Router()
 
 // Server-to-server webhooks — authenticated by signature / shared-secret
 // header, NOT by a session. Declared before `protect` so they aren't gated.
+// `/webhook` stays as Razorpay's URL to avoid breaking its dashboard config.
 router.post('/webhook', razorpayWebhook)
+router.post('/phonepe-webhook', phonepeWebhook)
 router.post('/delhivery-webhook', delhiveryWebhook)
 
 // Everything else belongs to a user — needs a valid session.

@@ -43,6 +43,12 @@ const VERIFY_LABEL = { paid: 'Paid', failed: 'Failed', pending: 'Pending' }
 // so the two can be compared for a match.
 const OUR_TO_VERIFY = { created: 'pending', paid: 'paid', failed: 'failed' }
 
+// Human-facing brand names per provider. Old orders without `provider`
+// default to Razorpay (matches the server-side fallback in payments/index.js).
+const PROVIDER_LABEL = { razorpay: 'Razorpay', phonepe: 'PhonePe' }
+const providerOf = (order) => order?.provider || 'razorpay'
+const providerLabel = (order) => PROVIDER_LABEL[providerOf(order)] || 'Payment'
+
 const orderNoOf = (order) => order._id.slice(-8).toUpperCase()
 const customerOf = (order) =>
   order.user?.name || order.shippingAddress?.fullName || 'Unknown'
@@ -78,6 +84,39 @@ function PaymentChip({ status }) {
     <span className={`eyebrow rounded-full border px-3 py-1 ${tone}`}>
       {PAYMENT_LABEL[status] || status}
     </span>
+  )
+}
+
+/* Provider IDs column — swaps labels + fields based on order.provider, so
+   the admin sees `Razorpay order ID` for a Razorpay order and `PhonePe
+   merchant order ID` for a PhonePe order. Old orders without `provider`
+   read as Razorpay (matches the server-side default). */
+function ProviderIds({ order }) {
+  const name = providerLabel(order)
+  const isPhonepe = providerOf(order) === 'phonepe'
+  const orderIdValue = isPhonepe
+    ? order.phonepeMerchantOrderId
+    : order.razorpayOrderId
+  const paymentIdValue = isPhonepe
+    ? order.phonepeTransactionId
+    : order.razorpayPaymentId
+  const orderIdLabel = isPhonepe ? 'merchant order ID' : 'order ID'
+  const paymentIdLabel = isPhonepe ? 'transaction ID' : 'payment ID'
+  return (
+    <div>
+      <p className="eyebrow text-canvas/40">
+        {name} {orderIdLabel}
+      </p>
+      <p className="mt-2 break-all text-sm text-canvas/85">
+        {orderIdValue || '—'}
+      </p>
+      <p className="eyebrow mt-4 text-canvas/40">
+        {name} {paymentIdLabel}
+      </p>
+      <p className="mt-2 break-all text-sm text-canvas/85">
+        {paymentIdValue || '—'}
+      </p>
+    </div>
   )
 }
 
@@ -263,7 +302,9 @@ function OrderListRow({ order, selected, onClick }) {
   )
 }
 
-/* ── Razorpay verify panel — sits beside the status pills ── */
+/* ── Payment-provider verify panel — sits beside the status pills.
+   Dispatch is server-side (see orderController.verifyOrderPayment +
+   payments/index.js), so this UI is provider-agnostic. ── */
 function VerifyPanel({ order, verifying, error, onRecheck }) {
   const v = order.verification
   const ourStatus = OUR_TO_VERIFY[order.paymentStatus]
@@ -294,7 +335,9 @@ function VerifyPanel({ order, verifying, error, onRecheck }) {
           Re-check
         </button>
       </div>
-      <p className="eyebrow mt-2 text-canvas/40">Razorpay check</p>
+      <p className="eyebrow mt-2 text-canvas/40">
+        {providerLabel(order)} check
+      </p>
       {error ? (
         <p className="mt-1.5 text-xs text-dusk">{error}</p>
       ) : v && !verifying && !matches ? (
@@ -537,7 +580,7 @@ function OrderDetail({
         </div>
       </div>
 
-      {/* Customer · shipping · Razorpay references */}
+      {/* Customer · shipping · provider references */}
       <div className="mt-8 grid gap-8 sm:grid-cols-3">
         <div>
           <p className="eyebrow text-canvas/40">Customer</p>
@@ -559,17 +602,9 @@ function OrderDetail({
             {addr.phone}
           </p>
         </div>
-        {/* Razorpay IDs — for looking the order up in the Razorpay dashboard */}
-        <div>
-          <p className="eyebrow text-canvas/40">Razorpay order ID</p>
-          <p className="mt-2 break-all text-sm text-canvas/85">
-            {order.razorpayOrderId || '—'}
-          </p>
-          <p className="eyebrow mt-4 text-canvas/40">Razorpay payment ID</p>
-          <p className="mt-2 break-all text-sm text-canvas/85">
-            {order.razorpayPaymentId || '—'}
-          </p>
-        </div>
+        {/* Provider IDs — labels and fields swap by the order's provider so
+            you can look this order up in the right gateway's dashboard. */}
+        <ProviderIds order={order} />
       </div>
 
       {/* Items */}
@@ -804,14 +839,16 @@ export default function AdminOrdersPage() {
       list.map((o) => (o._id === updated._id ? updated : o)),
     )
 
-  // Run the Razorpay verify check and fold the result back in.
+  // Run the payment-provider verify check and fold the result back in.
+  // The provider is decided server-side from order.provider, so we don't
+  // need to know it here — it could be Razorpay OR PhonePe.
   const runVerify = async (id) => {
     setVerifyingId(id)
     setVerifyError('')
     try {
       mergeOrder(await verifyOrder(id))
     } catch (err) {
-      setVerifyError(err.message || 'Could not reach Razorpay.')
+      setVerifyError(err.message || 'Could not reach the payment provider.')
     } finally {
       setVerifyingId(null)
     }

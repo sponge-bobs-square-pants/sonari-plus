@@ -100,13 +100,8 @@ export default function CheckoutPage() {
     setStatus('paying')
     setError('')
 
-    const ready = await loadRazorpay()
-    if (!ready) {
-      setStatus('error')
-      setError('Could not reach the payment service. Please try again.')
-      return
-    }
-
+    // 1) Server creates the order — the response tells us which provider
+    //    handled it (so we always trust the server, never assume).
     let data
     try {
       data = await createOrder(shipping, saveFlag)
@@ -116,11 +111,31 @@ export default function CheckoutPage() {
       return
     }
 
+    // 2) Branch by provider. Razorpay → popup. PhonePe → redirect.
+    if (data.provider === 'phonepe') {
+      const url = data.phonepe?.redirectUrl
+      if (!url) {
+        setStatus('error')
+        setError('Payment provider did not return a checkout URL.')
+        return
+      }
+      // PhonePe takes the whole tab; on return we land on /order/processing.
+      window.location.assign(url)
+      return
+    }
+
+    // Razorpay path (default + explicit `provider === 'razorpay'`).
+    const ready = await loadRazorpay()
+    if (!ready) {
+      setStatus('error')
+      setError('Could not reach the payment service. Please try again.')
+      return
+    }
     const rzp = new window.Razorpay({
-      key: data.keyId,
-      amount: data.amount,
-      currency: data.currency,
-      order_id: data.razorpayOrderId,
+      key: data.razorpay.keyId,
+      amount: data.razorpay.amount,
+      currency: data.razorpay.currency,
+      order_id: data.razorpay.orderId,
       name: `${BRAND.legalName} Nightwear`,
       description: 'Order payment',
       prefill: {
@@ -132,6 +147,7 @@ export default function CheckoutPage() {
       handler: async (response) => {
         try {
           const order = await verifyPayment({
+            orderId: data.orderId,
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,

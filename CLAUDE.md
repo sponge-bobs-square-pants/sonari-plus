@@ -353,30 +353,60 @@ a listener middleware (`features/cart/cartListener.js`, prepended in
 
 ## Checkout & payments
 
-`/checkout` (RequireAuth) — address form + order summary + Razorpay payment.
+`/checkout` (RequireAuth) — address form + order summary + payment.
+- **Two providers, env-switched: Razorpay and PhonePe.** `PROVIDER` env
+  picks the active one for NEW orders (accepts `RAZORPAY` / `RAZERPAY` /
+  `PHONEPE`, defaults to Razorpay). Existing orders carry a `provider`
+  field stamped at create-time, so flipping `PROVIDER` mid-day never
+  strands an in-flight order — its verify / webhook stays sticky to
+  whichever gateway it started on.
+- **Provider abstraction** → `server/src/payments/`. Each provider
+  (`razorpay.js`, `phonepe.js`) implements the same four-method
+  interface: `createCheckout(order)`, `verifyClientCallback(order, body)`,
+  `verifyWebhook(req)`, `recheckStatus(order)`. The dispatcher in
+  `payments/index.js` exports `getActiveProvider()` (for new orders),
+  `getProviderForOrder(order)` (for verify / re-check on existing
+  orders), and `getProviderByName(name)` (for the per-provider webhook
+  routes). `orderController` never imports a gateway directly.
 - **Razorpay keys** switch by `NODE_ENV` (`server/src/config/razorpay.js`):
-  production → `RAZORPAY_PROD_*`, else → `RAZORPAY_DEV_*`. No code change to
-  go live — set `NODE_ENV=production` and the prod keys.
+  production → `RAZORPAY_PROD_*`, else → `RAZORPAY_DEV_*`. JS popup flow,
+  HMAC-signed verify callback.
+- **PhonePe** (`server/src/config/phonepe.js`) — **PG v2 OAuth**, NOT v1
+  salt-key. Env: `PHONEPE_DEV_CLIENT_ID` / `PHONEPE_DEV_SECRET` (+ PROD
+  equivalents). Module-scoped token cache refreshes lazily. Webhook auth
+  is `Authorization: SHA256(username:password)` matching the pair set in
+  the PhonePe portal AND in `PHONEPE_*_WEBHOOK_USERNAME/PASSWORD`. Full-
+  page redirect flow (not a popup) → customer lands back on
+  `/order/processing` which polls `/verify` until the PhonePe status
+  flips COMPLETED (sometimes takes a few seconds post-redirect, so verify
+  returns `202 { status: 'pending' }` to signal "try again").
 - **Order model** (`server/src/models/Order.js`) — item snapshots, shipping
-  address, server-computed `subtotal`/`deliveryFee`/`total`, `razorpayOrderId`,
+  address, server-computed `subtotal`/`deliveryFee`/`total`, `provider`
+  (`razorpay` | `phonepe`, defaults `razorpay`), `razorpayOrderId` /
+  `razorpayPaymentId` (Razorpay orders), `phonepeMerchantOrderId` /
+  `phonepeTransactionId` (PhonePe orders),
   `paymentStatus` (`created`→`paid`/`failed`), `status` (`placed → accepted →
   manifested → dispatched → delivered`, plus `cancelled` / `failed-delivery`),
   and `returnDeadline` — the last day a return may be requested; stamped when the
   order is marked **delivered** (delivery date + the 10-day return window),
   null until then. Also `seenByAdmin` (drives the admin "New" badge),
   `verification`
-  (`{ status, checkedAt }` — the admin's stored Razorpay re-check result),
+  (`{ status, checkedAt }` — the admin's stored provider re-check result),
   `billOfSupply` (`{ number, url, issuedAt }` — null until generated),
   `courier`/`trackingId` (set when shipped — `trackingId` is the Delhivery
   waybill), `pickupId` (the Delhivery pickup-request id, set when a batch
   pickup is booked), and `trackingScans[]` (Delhivery scans pushed by the
   Scan Push webhook — append-only, deduped; the `DL`/`Delivered` scan flips
   the order to delivered).
-- Flow: `POST /api/orders/create` builds a pending Order + a Razorpay order
-  (totals computed server-side from the DB cart — client totals never trusted)
-  → client opens Razorpay → `POST /api/orders/verify` checks the HMAC
-  signature, marks the order paid, empties the cart, and **decrements variant
-  stock** → `/order/confirmed`.
+- Flow: `POST /api/orders/create` builds a pending Order (provider stamped
+  from env) + a provider checkout session (totals computed server-side
+  from the DB cart — client totals never trusted) → client receives a
+  discriminated payload (`{ provider: 'razorpay', razorpay: {...} }` OR
+  `{ provider: 'phonepe', phonepe: { redirectUrl } }`) → Razorpay flow
+  opens the popup; PhonePe flow `window.location.assign(redirectUrl)`s →
+  `POST /api/orders/verify` dispatches to the order's provider and
+  marks paid, empties the cart, **decrements variant stock** →
+  `/order/confirmed`.
 - On payment success, `reduceStockForOrder` lowers `colors[].sizes[].stock` for
   each ordered variant. It runs in BOTH verify and the webhook, but the
   `paymentStatus !== 'paid'` idempotency guard means it fires exactly once per
@@ -465,6 +495,13 @@ a listener middleware (`features/cart/cartListener.js`, prepended in
   verified against the RAW body (`index.js` keeps it on `req.rawBody` via the
   `express.json` `verify` hook); mounted before `protect` since it has no
   session. Secret: `RAZORPAY_DEV/PROD_WEBHOOK_SECRET`. Idempotent with verify.
+- `POST /api/orders/phonepe-webhook` — PhonePe's S2S callback. Same role
+  as Razorpay's webhook (the reliable backup if the browser-redirect
+  flow is lost), but auth differs: PhonePe sends
+  `Authorization: SHA256(username:password)` matching
+  `PHONEPE_*_WEBHOOK_USERNAME/PASSWORD`. Both webhooks share
+  `handleProviderWebhook` so the idempotent "mark paid + clear cart +
+  reduce stock" path is one place.
 - `POST /api/orders/delhivery-webhook` — Delhivery's **Scan Push** (built;
   goes live once Delhivery enables it for our prod URL — needs the public
   domain + their requirement-doc process to `lastmile-integration@delhivery.com`).

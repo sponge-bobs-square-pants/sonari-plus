@@ -1,15 +1,14 @@
-import crypto from 'crypto'
 import Order from '../models/Order.js'
 import Cart from '../models/Cart.js'
 import Product, { effectiveVariantPrice } from '../models/Product.js'
 import Counter from '../models/Counter.js'
 import cloudinary from '../config/cloudinary.js'
 import {
-  razorpay,
-  RAZORPAY_KEY_ID,
-  RAZORPAY_KEY_SECRET,
-  RAZORPAY_WEBHOOK_SECRET,
-} from '../config/razorpay.js'
+  activeProviderName,
+  getActiveProvider,
+  getProviderForOrder,
+  getProviderByName,
+} from '../payments/index.js'
 import { financialYear, buildBillOfSupplyPdf } from '../utils/billOfSupply.js'
 import { sendBillOfSupplyEmail } from '../utils/mailer.js'
 import {
@@ -40,6 +39,21 @@ function cleanAddress(input = {}) {
       typeof input[field] === 'string' ? input[field].trim() : ''
   }
   return address
+}
+
+/**
+ * The idempotent paid-path — used by BOTH the browser-verify endpoint
+ * and the S2S webhooks. The guard on paymentStatus is what makes the
+ * second arrival a harmless no-op; whichever path fires first wins.
+ */
+async function markOrderPaid(order, paymentId) {
+  if (order.paymentStatus === 'paid') return // idempotent
+  const provider = getProviderForOrder(order)
+  order.paymentStatus = 'paid'
+  if (paymentId) provider.stampPaymentId(order, paymentId)
+  await order.save()
+  await Cart.findOneAndUpdate({ user: order.user }, { items: [] })
+  await reduceStockForOrder(order)
 }
 
 /**
@@ -150,9 +164,10 @@ export async function createOrder(req, res, next) {
     const deliveryFee = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE
     const total = subtotal + deliveryFee
 
-    // Our order first — its id becomes the Razorpay receipt reference.
-    // (`returnDeadline` is NOT set here — the return window starts on
-    // delivery, so it's stamped when the order is marked delivered.)
+    // Our order first — provider is stamped so verify / webhook always
+    // know which gateway to call later, regardless of any env switch in
+    // between. (`returnDeadline` is NOT set here — the return window
+    // starts on delivery, so it's stamped when the order is marked delivered.)
     const order = await Order.create({
       user: req.user._id,
       items,
@@ -160,16 +175,20 @@ export async function createOrder(req, res, next) {
       subtotal,
       deliveryFee,
       total,
+      provider: activeProviderName(),
     })
 
-    const rzpOrder = await razorpay.orders.create({
-      amount: Math.round(total * 100), // Razorpay works in paise
-      currency: 'INR',
-      receipt: order._id.toString(),
-    })
-
-    order.razorpayOrderId = rzpOrder.id
-    await order.save()
+    // Provider-specific checkout session. Razorpay returns popup data;
+    // PhonePe returns a redirectUrl. The client branches on `provider`.
+    let checkout
+    try {
+      checkout = await getActiveProvider().createCheckout(order)
+    } catch (err) {
+      console.error('[checkout] provider createCheckout failed:', err.message)
+      return res
+        .status(502)
+        .json({ message: 'Could not reach the payment service. Please try again.' })
+    }
 
     // Optionally save the address to the customer's profile.
     if (req.body.saveAddress) {
@@ -186,29 +205,27 @@ export async function createOrder(req, res, next) {
       }
     }
 
-    res.status(201).json({
-      orderId: order._id,
-      razorpayOrderId: rzpOrder.id,
-      amount: rzpOrder.amount,
-      currency: rzpOrder.currency,
-      keyId: RAZORPAY_KEY_ID,
-    })
+    res.status(201).json({ orderId: order._id, ...checkout })
   } catch (err) {
     next(err)
   }
 }
 
 /**
- * POST /api/orders/verify — confirm Razorpay's payment signature. On a
- * valid signature the order is marked paid and the cart is emptied.
+ * POST /api/orders/verify — confirm a payment after the customer returns
+ * from the gateway. Dispatches to the right provider based on the order's
+ * stamped `provider`. Accepts either `{ orderId }` (new shape used by both
+ * flows) OR `{ razorpay_order_id, ... }` (legacy Razorpay shape, to keep
+ * deploys safe while old clients are still around).
  */
 export async function verifyPayment(req, res, next) {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
-      req.body
-
+    const { orderId, razorpay_order_id } = req.body
     const order = await Order.findOne({
-      razorpayOrderId: razorpay_order_id,
+      $or: [
+        orderId ? { _id: orderId } : null,
+        razorpay_order_id ? { razorpayOrderId: razorpay_order_id } : null,
+      ].filter(Boolean),
       user: req.user._id,
     })
     if (!order) return res.status(404).json({ message: 'Order not found.' })
@@ -216,31 +233,28 @@ export async function verifyPayment(req, res, next) {
     // Already finalised — return it (handles a duplicate callback).
     if (order.paymentStatus === 'paid') return res.json({ order })
 
-    const expectedSignature = crypto
-      .createHmac('sha256', RAZORPAY_KEY_SECRET)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest('hex')
-
-    if (expectedSignature !== razorpay_signature) {
-      console.warn(
-        `[verify] SIGNATURE MISMATCH — order ${order._id} flagged failed`,
-      )
+    const provider = getProviderForOrder(order)
+    const { valid, paymentId, pending } = await provider.verifyClientCallback(
+      order,
+      req.body,
+    )
+    // PhonePe specifically can take a few seconds after the browser
+    // redirect to flip COMPLETED — return 202 so the client polls
+    // rather than marking the order failed.
+    if (pending) {
+      return res.status(202).json({ status: 'pending', orderId: order._id })
+    }
+    if (!valid) {
+      console.warn(`[verify] ${provider.name} rejected — order ${order._id}`)
       order.paymentStatus = 'failed'
       await order.save()
       return res.status(400).json({ message: 'Payment verification failed.' })
     }
 
-    order.paymentStatus = 'paid'
-    order.razorpayPaymentId = razorpay_payment_id
-    await order.save()
+    await markOrderPaid(order, paymentId)
     console.log(
-      `[verify] order ${order._id} confirmed paid · payment ${razorpay_payment_id}`,
+      `[verify] order ${order._id} confirmed paid via ${provider.name} · txn ${paymentId}`,
     )
-
-    // The paid items leave the cart, and their stock comes down.
-    await Cart.findOneAndUpdate({ user: req.user._id }, { items: [] })
-    await reduceStockForOrder(order)
-
     res.json({ order })
   } catch (err) {
     next(err)
@@ -329,27 +343,13 @@ export async function listAllOrders(req, res, next) {
 
 /**
  * The admin verify check — re-confirm an order's payment straight from
- * Razorpay (not from our own records). Returns 'paid' | 'failed' |
- * 'pending'. 'paid' requires a CAPTURED payment whose amount equals the
- * order total in paise — the owner's rule, so a wrong-amount capture does
- * NOT count as paid.
+ * its provider (NOT from our records). Returns 'paid' | 'failed' | 'pending'.
+ * 'paid' requires a CAPTURED payment whose amount equals the order total
+ * — the owner's rule, so a wrong-amount capture does NOT count as paid.
  */
-async function verifyWithRazorpay(order) {
-  if (!order.razorpayOrderId) return 'pending'
-
-  const { items = [] } = await razorpay.orders.fetchPayments(
-    order.razorpayOrderId,
-  )
-  const expectedPaise = Math.round(order.total * 100)
-
-  const cleanCapture = items.some(
-    (p) => p.status === 'captured' && p.amount === expectedPaise,
-  )
-  if (cleanCapture) return 'paid'
-
-  const anyCapture = items.some((p) => p.status === 'captured')
-  if (!anyCapture && items.some((p) => p.status === 'failed')) return 'failed'
-  return 'pending'
+async function verifyWithProvider(order) {
+  const provider = getProviderForOrder(order)
+  return provider.recheckStatus(order)
 }
 
 /** POST /api/orders/admin/:id/seen — mark an order opened by the admin. */
@@ -384,7 +384,7 @@ export async function verifyOrderPayment(req, res, next) {
     if (!order) return res.status(404).json({ message: 'Order not found.' })
 
     order.verification = {
-      status: await verifyWithRazorpay(order),
+      status: await verifyWithProvider(order),
       checkedAt: new Date(),
     }
     await order.save()
@@ -783,45 +783,63 @@ export async function listBills(req, res, next) {
  * harmless no-op.
  */
 export async function razorpayWebhook(req, res) {
+  return handleProviderWebhook(req, res, 'razorpay', {
+    paidEvents: ['payment.captured'],
+    failedEvents: ['payment.failed'],
+  })
+}
+
+/**
+ * POST /api/orders/phonepe-webhook — PhonePe's S2S callback. Authenticated
+ * by `Authorization: SHA256(username:password)` matching the pair we set
+ * in the PhonePe portal. Mounted before `protect` (no session) — the same
+ * spot as the Razorpay webhook.
+ */
+export async function phonepeWebhook(req, res) {
+  // TEMP: visibility for the PhonePe portal's "Validate" + first live tests.
+  // Strip these once we've confirmed the wiring end-to-end.
+  console.log('📩 [phonepe webhook] HIT', {
+    method: req.method,
+    contentType: req.headers['content-type'],
+    hasAuthHeader: Boolean(req.headers['authorization']),
+    bodyKeys: req.body ? Object.keys(req.body) : null,
+    event: req.body?.event,
+    payloadKeys: req.body?.payload ? Object.keys(req.body.payload) : null,
+  })
+  return handleProviderWebhook(req, res, 'phonepe', {
+    paidEvents: ['checkout.order.completed', 'pg.checkout.order.completed'],
+    failedEvents: ['checkout.order.failed', 'pg.checkout.order.failed'],
+  })
+}
+
+/**
+ * Shared S2S webhook plumbing — every provider's webhook does the same
+ * three things: verify signature, find OUR order, advance state. Only
+ * which events count as paid / failed differs per provider.
+ *
+ * Idempotent: markOrderPaid guards on paymentStatus, so a re-pushed
+ * webhook does nothing the second time.
+ */
+async function handleProviderWebhook(req, res, providerName, { paidEvents, failedEvents }) {
   try {
-    if (!RAZORPAY_WEBHOOK_SECRET) {
-      return res
-        .status(500)
-        .json({ message: 'Webhook secret is not configured.' })
+    const provider = getProviderByName(providerName)
+    if (!provider) {
+      return res.status(500).json({ message: `Provider ${providerName} not configured.` })
+    }
+    const { valid, event, providerOrderId, paymentId } = await provider.verifyWebhook(req)
+    if (!valid) {
+      console.warn(`[webhook:${providerName}] INVALID — rejected`)
+      return res.status(400).json({ message: 'Invalid webhook.' })
     }
 
-    const signature = req.headers['x-razorpay-signature']
-    const expected = crypto
-      .createHmac('sha256', RAZORPAY_WEBHOOK_SECRET)
-      .update(req.rawBody || Buffer.from(''))
-      .digest('hex')
-
-    if (!signature || expected !== signature) {
-      console.warn('[webhook] INVALID SIGNATURE — rejected (not from Razorpay)')
-      return res.status(400).json({ message: 'Invalid webhook signature.' })
-    }
-
-    const { event, payload } = req.body
-    console.log(`[webhook] verified call from Razorpay · event: ${event}`)
-    const payment = payload?.payment?.entity
-
-    if (payment?.order_id) {
-      const order = await Order.findOne({ razorpayOrderId: payment.order_id })
-
-      if (
-        order &&
-        event === 'payment.captured' &&
-        order.paymentStatus !== 'paid'
-      ) {
-        order.paymentStatus = 'paid'
-        order.razorpayPaymentId = payment.id
-        await order.save()
-        await Cart.findOneAndUpdate({ user: order.user }, { items: [] })
-        await reduceStockForOrder(order)
-        console.log(`[webhook] order ${order._id} marked paid`)
+    if (providerOrderId) {
+      const order = await provider.findOrderByWebhook(Order, providerOrderId)
+      if (order && paidEvents.includes(event)) {
+        await markOrderPaid(order, paymentId)
+        console.log(`[webhook:${providerName}] order ${order._id} marked paid`)
       } else if (
         order &&
-        event === 'payment.failed' &&
+        failedEvents.includes(event) &&
         order.paymentStatus === 'created'
       ) {
         order.paymentStatus = 'failed'
@@ -831,8 +849,8 @@ export async function razorpayWebhook(req, res) {
 
     res.json({ received: true })
   } catch (err) {
-    // A 500 tells Razorpay to retry the webhook later.
-    console.error('Razorpay webhook error:', err.message)
+    console.error(`[webhook:${providerName}] error:`, err.message)
+    // A 500 tells the provider to retry the webhook later.
     res.status(500).json({ message: 'Webhook processing error.' })
   }
 }

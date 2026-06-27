@@ -106,9 +106,23 @@ const orderSchema = new mongoose.Schema(
     deliveryFee: { type: Number, required: true, min: 0 },
     total: { type: Number, required: true, min: 0 },
 
+    // Active payment provider for this order. Drives verify / webhook
+    // dispatch — old orders default to razorpay so a switch via env never
+    // strands an in-flight order under the previous provider.
+    provider: {
+      type: String,
+      enum: ['razorpay', 'phonepe'],
+      default: 'razorpay',
+    },
+
     // Razorpay linkage.
     razorpayOrderId: { type: String, index: true },
     razorpayPaymentId: { type: String, default: '' },
+
+    // PhonePe linkage (PG v2 terminology).
+    phonepeMerchantOrderId: { type: String, index: true },
+    phonepeTransactionId: { type: String, default: '' },
+
     paymentStatus: {
       type: String,
       enum: ['created', 'paid', 'failed'],

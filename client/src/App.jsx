@@ -13,6 +13,7 @@ import TermsPage from './pages/TermsPage'
 import RefundPolicyPage from './pages/RefundPolicyPage'
 import CheckoutPage from './pages/CheckoutPage'
 import OrderConfirmationPage from './pages/OrderConfirmationPage'
+import OrderProcessingPage from './pages/OrderProcessingPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
@@ -74,6 +75,14 @@ function App() {
           element={
             <RequireAuth>
               <OrderConfirmationPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/order/processing"
+          element={
+            <RequireAuth>
+              <OrderProcessingPage />
             </RequireAuth>
           }
         />
