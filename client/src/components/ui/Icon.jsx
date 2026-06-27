@@ -66,6 +66,8 @@ const PATHS = {
       <circle cx="17" cy="18.5" r="1.7" />
     </>
   ),
+  'chevron-left': <path d="M14.5 6 8.5 12l6 6" />,
+  'chevron-right': <path d="M9.5 6 15.5 12l-6 6" />,
 }
 
 export default function Icon({ name, className = 'h-[26px] w-[26px]' }) {

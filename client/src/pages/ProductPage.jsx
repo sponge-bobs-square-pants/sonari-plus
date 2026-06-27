@@ -37,6 +37,7 @@ function buildProductDescription(product) {
 import Header from '../components/layout/Header'
 import Button from '../components/ui/Button'
 import Placeholder from '../components/ui/Placeholder'
+import ImageLightbox from '../components/product/ImageLightbox'
 
 export default function ProductPage() {
   // The route param is `slug` — either a rich "name-id" slug or, for old
@@ -61,6 +62,8 @@ export default function ProductPage() {
   const [activeImage, setActiveImage] = useState(0)
   const [hint, setHint] = useState('')
   const [added, setAdded] = useState(false)
+  // Image lightbox — opened by clicking the main hero photo.
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   useEffect(() => {
     // No 24-hex tail in the URL → no real product to load. Render error.
@@ -266,14 +269,23 @@ export default function ProductPage() {
               </div>
             )}
 
-            {/* Main image */}
+            {/* Main image — clicking it opens the lightbox for a zoomed
+                view. `cursor-zoom-in` is the only affordance; an overlay
+                badge would clutter the editorial photography. */}
             <div className="order-1 min-w-0 flex-1 lg:order-2">
               {gallery[activeImage] ? (
-                <img
-                  src={gallery[activeImage]}
-                  alt={product.name}
-                  className="block w-full"
-                />
+                <button
+                  type="button"
+                  onClick={() => setLightboxOpen(true)}
+                  aria-label="View larger image"
+                  className="block w-full cursor-zoom-in"
+                >
+                  <img
+                    src={gallery[activeImage]}
+                    alt={product.name}
+                    className="block w-full"
+                  />
+                </button>
               ) : (
                 <Placeholder tone="mid" className="aspect-[3/4] w-full" />
               )}
@@ -515,6 +527,18 @@ export default function ProductPage() {
           </div>
         </div>
       </main>
+
+      {/* Image lightbox — sits at the page root so its `fixed` positioning
+          is never affected by main's stacking context. Renders only when
+          opened to avoid running the scroll-lock effect on every page load. */}
+      {lightboxOpen && gallery.length > 0 && (
+        <ImageLightbox
+          images={gallery}
+          initialIndex={activeImage}
+          alt={product.name}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </>
   )
 }

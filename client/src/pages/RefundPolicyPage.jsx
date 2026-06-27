@@ -1,7 +1,7 @@
 import PolicyLayout from '../components/layout/PolicyLayout'
 import { BRAND } from '../data/brand'
 
-const UPDATED = '17 May 2026'
+const UPDATED = '27 June 2026'
 
 const INTRO =
   'We want you to be happy with your purchase. This policy explains when an order can be cancelled, how returns work, and how refunds are handled. Please read it before placing an order — and especially before opening your delivery.'
@@ -42,6 +42,7 @@ const SECTIONS = [
       'If your order arrives damaged, defective or incorrect, we will put it right — but we need proof of the issue at the moment of delivery.',
       'You must record a clear, continuous unboxing video that begins before the sealed package is opened and shows the damaged or incorrect product as it comes out of the parcel. Claims that are not supported by this video footage cannot be considered.',
       'Please report the issue, together with the video, within 2 days of delivery. Once we have verified it, a damaged or incorrect item is our responsibility — we will arrange a replacement or a full refund, with no restocking fee.',
+      'Once a replacement has been approved, the replacement product will be delivered to you within 10 days.',
     ],
   },
   {

@@ -1,7 +1,7 @@
 import PolicyLayout from '../components/layout/PolicyLayout'
 import { BRAND } from '../data/brand'
 
-const UPDATED = '17 May 2026'
+const UPDATED = '27 June 2026'
 
 const INTRO = `These Terms & Conditions govern your use of the ${BRAND.legalName} Nightwear website and any purchase you make from it. Please read them carefully — by browsing the site or placing an order, you agree to be bound by these terms.`
 
@@ -48,10 +48,12 @@ const SECTIONS = [
     ],
   },
   {
-    heading: 'Shipping and delivery',
+    heading: 'Shipping policy',
     body: [
-      'We currently ship within India only. Delivery is free on orders at or above ₹2,000; otherwise delivery charges are shown at checkout.',
-      'Delivery timeframes are estimates and are not guaranteed. Responsibility for the products passes to you once they are delivered to the address you provided.',
+      'We currently ship within India only. Delivery is free on orders at or above ₹2,000; below that threshold, delivery charges are shown at checkout. Orders are shipped through registered domestic courier companies and/or India Post (Speed Post) only.',
+      `Orders are delivered within 7 days from the date of the order and/or payment, or by the delivery date agreed at the time of order confirmation, subject to courier company or postal authority norms. ${BRAND.legalName} Nightwear shall not be liable for any delay in delivery by the courier company or postal authority.`,
+      'Delivery of all orders is made to the address provided by the buyer at the time of purchase. Delivery is confirmed by email to the address specified at the time of registration. Responsibility for the products passes to you once they are delivered to the address you provided.',
+      'Where shipping charges are levied at checkout, they are non-refundable.',
     ],
   },
   {
