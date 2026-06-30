@@ -11,6 +11,11 @@ import ContactPage from './pages/ContactPage'
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
 import TermsPage from './pages/TermsPage'
 import RefundPolicyPage from './pages/RefundPolicyPage'
+import SizeGuidePage from './pages/SizeGuidePage'
+import FabricCarePage from './pages/FabricCarePage'
+import SustainabilityPage from './pages/SustainabilityPage'
+import StockistsPage from './pages/StockistsPage'
+import JournalPage from './pages/JournalPage'
 import CheckoutPage from './pages/CheckoutPage'
 import OrderConfirmationPage from './pages/OrderConfirmationPage'
 import OrderProcessingPage from './pages/OrderProcessingPage'
@@ -51,6 +56,11 @@ function App() {
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/refund" element={<RefundPolicyPage />} />
+        <Route path="/size-guide" element={<SizeGuidePage />} />
+        <Route path="/fabric-care" element={<FabricCarePage />} />
+        <Route path="/sustainability" element={<SustainabilityPage />} />
+        <Route path="/stockists" element={<StockistsPage />} />
+        <Route path="/journal" element={<JournalPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />

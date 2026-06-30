@@ -5,13 +5,23 @@ import { BRAND } from '../../data/brand'
 // Items are plain strings (placeholder `#` links) or { label, to }
 // objects for ones with a real page.
 const COLUMNS = [
-  { title: 'Shop', items: ['Cordset', 'Night suits', 'Bras', 'Panties', 'New In'] },
+  {
+    title: 'Shop',
+    items: [
+      { label: 'Cordset', to: '/shop?category=nightwear' },
+      { label: 'Night wear', to: '/shop?category=nightdresses' },
+      { label: 'Bras', to: '/shop?category=bras' },
+      { label: 'Panties', to: '/shop?category=panties' },
+      { label: 'Kids', to: '/shop?category=kids' },
+      { label: 'New In', to: '/shop?tag=New' },
+    ],
+  },
   {
     title: 'Help',
     items: [
-      'Size guide',
-      'Delivery & returns',
-      'Fabric care',
+      { label: 'Size guide', to: '/size-guide' },
+      { label: 'Delivery & returns', to: '/refund' },
+      { label: 'Fabric care', to: '/fabric-care' },
       { label: 'Contact us', to: '/contact' },
     ],
   },
@@ -19,14 +29,16 @@ const COLUMNS = [
     title: BRAND.name,
     items: [
       { label: 'Our story', to: '/about' },
-      'Sustainability',
-      'Stockists',
-      'Journal',
+      { label: 'Sustainability', to: '/sustainability' },
+      { label: 'Stockists', to: '/stockists' },
+      { label: 'Journal', to: '/journal' },
     ],
   },
 ]
 
-const SOCIALS = ['Instagram', 'Pinterest', 'Facebook']
+// Social links — disabled until the brand opens the actual accounts.
+// Uncomment SOCIALS + the rendering block in the lower bar to bring back.
+// const SOCIALS = ['Instagram', 'Pinterest', 'Facebook']
 
 const LEGAL = [
   { label: 'Privacy policy', to: '/privacy' },
@@ -99,6 +111,7 @@ export default function Footer() {
               ))}
             </ul>
           </div>
+          {/* Socials disabled — accounts not yet open. Uncomment when ready.
           <ul className="flex gap-6">
             {SOCIALS.map((s) => (
               <li key={s}>
@@ -111,6 +124,7 @@ export default function Footer() {
               </li>
             ))}
           </ul>
+          */}
         </div>
       </div>
     </footer>
