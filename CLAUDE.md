@@ -40,9 +40,11 @@ Live on a **DigitalOcean droplet** (`143.110.184.135`, Ubuntu, 1GB). Domains
   is baked at build time by the Makefile build-arg; changing it needs a rebuild.
 - **Deploy order: backend first, then frontend** — the frontend's invoice links
   call backend routes that must exist first.
-- `NODE_ENV=production` switches BOTH Razorpay and Delhivery to prod keys at
-  once. Currently the droplet runs `NODE_ENV=development` (test keys) — a
-  soft-launch; Razorpay prod keys aren't set yet.
+- `NODE_ENV=production` switches Razorpay AND PhonePe to prod keys.
+  Delhivery uses its OWN `DELHIVERY_MODE` env var (independent of
+  NODE_ENV) so shipping can be pinned to staging while payments are
+  live — set `DELHIVERY_MODE=production` only when the live Delhivery
+  account (waybills, pickup warehouse, KYC) is fully set up.
 
 ## Design system — READ BEFORE building any UI
 

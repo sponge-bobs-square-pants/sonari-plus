@@ -1,11 +1,14 @@
 /**
- * Delhivery API config — credentials + base URL switch by NODE_ENV,
- * mirroring config/razorpay.js. Full integration reference: DELHIVERY.md.
+ * Delhivery API config. Credentials + base URL switch on the DEDICATED
+ * `DELHIVERY_MODE` env var (NOT NODE_ENV) so shipping can be run against
+ * Delhivery's staging cluster even while the rest of the app is fully in
+ * production (Razorpay, PhonePe on prod keys). Full integration
+ * reference: DELHIVERY.md.
  *
- *   production  → DELHIVERY_PROD_API_KEY + https://track.delhivery.com
- *   else (dev)  → DELHIVERY_DEV_API_KEY  + https://staging-express.delhivery.com
+ *   DELHIVERY_MODE=production  → DELHIVERY_PROD_API_KEY + https://track.delhivery.com
+ *   anything else (default)     → DELHIVERY_DEV_API_KEY  + https://staging-express.delhivery.com
  */
-const isProd = process.env.NODE_ENV === 'production'
+const isProd = process.env.DELHIVERY_MODE === 'production'
 
 export const DELHIVERY = {
   // Base for ALL APIs incl. tracking — staging-express (dev) / track (prod).
@@ -31,7 +34,7 @@ export const DELHIVERY = {
 
 if (!DELHIVERY.token) {
   console.warn(
-    `⚠ Delhivery token missing for NODE_ENV=${process.env.NODE_ENV} — dispatch/tracking will fail until it is set.`,
+    `⚠ Delhivery token missing for DELHIVERY_MODE=${process.env.DELHIVERY_MODE || '(unset)'} — dispatch/tracking will fail until it is set.`,
   )
 }
 
